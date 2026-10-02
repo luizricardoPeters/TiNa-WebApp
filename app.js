@@ -3,8 +3,9 @@
    - Echt: Gmail und Google Kalender über google.js. */
 (function () {
   "use strict";
-  var CFG = window.TINA_CONFIG || {}, L = window.TinaLogic, G = window.TinaGoogle;
+  var CFG = window.TINA_CONFIG || {}, L = window.TinaLogic, G = window.TinaGoogle, N = window.TinaNotes;
   var DEMO = !G.configured();
+  var NSB = !DEMO && N.configured(); /* Notizen über Supabase */
 
   var CATS = {
     fam: { name: "Familie", color: "var(--c-fam)" },
@@ -31,11 +32,12 @@
   var state = {
     tab: "home", openMail: null, filter: "alle", day: 0, size: lsGet("tina_size", "normal"),
     confirmSend: null, sending: false, sendErr: "",
-    mails: [], events: [], notes: [],
+    mails: [], events: [], notes: [], projects: [], nSt: "idle", nErr: "", nBusy: false,
     mailSt: "idle", mailErr: "", mailNote: "", calSt: "idle", calErr: "", calNote: "",
     gisReady: false, connecting: false, connectErr: "", loadedAt: 0
   };
   var PROJECTS = DEMO ? ["Familie", "Haushalt", "Urlaub"] : ["Allgemein", "Tiere", "Organisation"];
+  function projectNames() { return NSB && state.projects.length ? state.projects.map(function (p) { return p.name; }) : PROJECTS; }
   state.project = PROJECTS[0];
 
   if (DEMO) {
@@ -71,7 +73,7 @@
       { id: 4, project: "Urlaub", who: "Anna", when: "Montag", text: "Ferienhaus Nordsee: drei Angebote verglichen, Liste folgt." }
     ];
   } else {
-    try { state.notes = JSON.parse(lsGet("tina_notes", "[]")) || []; } catch (e) { state.notes = []; }
+    if (!NSB) { try { state.notes = JSON.parse(lsGet("tina_notes", "[]")) || []; } catch (e) { state.notes = []; } }
   }
 
   /* ---------- Hilfen ---------- */
@@ -130,6 +132,22 @@
     return Promise.all([loadMail(), loadCal()]).then(function () { state.loadedAt = Date.now(); render(); });
   }
 
+  function loadNotes() {
+    if (!NSB || !N.session()) return Promise.resolve();
+    state.nSt = "loading"; render();
+    return Promise.all([N.projects(), N.notes()]).then(function (r) {
+      if (!r[0].length) { state.nSt = "denied"; state.projects = []; state.notes = []; return; }
+      var names = {}; r[0].forEach(function (p) { names[p.id] = p.name; });
+      state.projects = r[0];
+      if (names && !projectNames().includes(state.project)) state.project = r[0][0].name;
+      var me = (N.user() || {}).email;
+      state.notes = r[1].map(function (n) {
+        return { id: n.id, project: names[n.project_id] || "", who: n.author_name || String(n.author_email || "").split("@")[0], ts: Date.parse(n.created_at), text: n.text, mine: n.author_email === me };
+      });
+      state.nSt = "ok";
+    }).catch(function (e) { state.nSt = "error"; state.nErr = friendly(e); }).then(render);
+  }
+
   /* ---------- Bausteine ---------- */
   var ICON = {
     home: '<svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
@@ -160,7 +178,7 @@
     return '<div class="row"><span class="time">' + (e.time || "Ganztag") + '</span><span class="grow"><div class="t">' + esc(e.title) + '</div><div class="s">' + sub + "</div></span></div>";
   }
   function noteCard(n) {
-    return '<div class="note"><p>' + esc(n.text) + '</p><div class="who">' + esc(n.who) + " · " + esc(noteWhen(n)) + " · " + esc(n.project) + "</div></div>";
+    return '<div class="note"><p>' + esc(n.text) + '</p><div class="who">' + esc(n.who) + " · " + esc(noteWhen(n)) + " · " + esc(n.project) + (n.mine ? ' · <button class="link" style="min-height:0;padding:0;font-weight:400" data-delnote="' + esc(n.id) + '">löschen</button>' : "") + "</div></div>";
   }
   function connectCard() {
     var again = G.wasConnected();
@@ -248,11 +266,24 @@
   }
 
   function proj() {
+    if (NSB && state.nSt !== "ok") {
+      var u = N.user(), msg;
+      if (!N.session()) {
+        msg = '<div class="card"><h3>Anmelden für gemeinsame Notizen</h3><div>Melde dich mit deinem Google-Konto an. Nur freigeschaltete Adressen sehen die Notizen.</div><div class="info">Google zeigt dabei eventuell wieder den Hinweis „Nicht bestätigte App“. Wie bei E-Mail: „Erweitert“, dann „Weiter“.</div>' +
+          (state.nErr ? '<div class="info" style="background:var(--warn-soft);color:var(--warn)">' + esc(state.nErr) + "</div>" : "") +
+          '<div class="btns"><button class="btn" data-nlogin="1"' + (state.nReady ? "" : " disabled") + ">" + (state.nReady ? "Mit Google anmelden" : "Wird vorbereitet …") + "</button></div></div>";
+      } else if (state.nSt === "denied") {
+        msg = '<div class="card"><h3>Noch nicht freigeschaltet</h3><div>Die Adresse ' + esc(u ? u.email : "") + ' hat keinen Zugriff auf die Notizen. Bitte beim Betreiber der App freischalten lassen.</div><div class="btns"><button class="btn ghost" data-nlogout="1">Abmelden</button></div></div>';
+      } else if (state.nSt === "error") {
+        msg = '<div class="info" style="background:var(--warn-soft);color:var(--warn)">' + esc(state.nErr) + '</div><div class="btns" style="margin-top:12px"><button class="btn" data-nreload="1">Nochmal versuchen</button></div>';
+      } else { msg = '<div class="empty">Lade …</div>'; }
+      return msg;
+    }
     var notes = state.notes.filter(function (n) { return n.project === state.project; });
-    return '<div class="filters" role="group" aria-label="Projekte">' + PROJECTS.map(function (p) { return '<button data-project="' + p + '" aria-pressed="' + (state.project === p) + '">' + p + "</button>"; }).join("") + "</div>" +
-      '<div class="info" style="margin-bottom:16px">' + (DEMO ? "Hier erscheinen die gemeinsamen Notizen aus dem Projektordner." : "Diese Notizen liegen vorerst nur auf diesem Gerät. Gemeinsame Notizen für alle folgen im nächsten Schritt.") + '</div><div class="list" style="margin-bottom:20px">' +
+    return '<div class="filters" role="group" aria-label="Projekte">' + projectNames().map(function (p) { return '<button data-project="' + esc(p) + '" aria-pressed="' + (state.project === p) + '">' + esc(p) + "</button>"; }).join("") + "</div>" +
+      '<div class="info" style="margin-bottom:16px">' + (DEMO ? "Hier erscheinen die gemeinsamen Notizen aus dem Projektordner." : NSB ? "Gemeinsame Notizen: alle freigeschalteten Personen sehen sie sofort." : "Diese Notizen liegen vorerst nur auf diesem Gerät.") + '</div><div class="list" style="margin-bottom:20px">' +
       (notes.length ? notes.map(noteCard).join("") : '<div class="empty">In diesem Projekt gibt es noch keine Notizen.</div>') + "</div>" +
-      '<form class="card" id="noteform"><label for="note-text">Neue Notiz für ' + esc(state.project) + '</label><textarea id="note-text" required placeholder="Was soll das Team wissen?" style="min-height:100px"></textarea><div class="btns"><button class="btn" type="submit">Notiz speichern</button></div></form>';
+      '<form class="card" id="noteform"><label for="note-text">Neue Notiz für ' + esc(state.project) + '</label><textarea id="note-text" required placeholder="Was soll das Team wissen?" style="min-height:100px"></textarea><div class="btns"><button class="btn" type="submit"' + (state.nBusy ? " disabled" : "") + ">Notiz speichern</button></div></form>";
   }
 
   function settings() {
@@ -276,7 +307,7 @@
       '<div class="btns"><button class="btn" type="submit">Speichern</button></div></form>';
     return google +
       '<div class="card" style="margin-bottom:16px"><h3>Weitere E-Mail-Konten</h3>' + row("GMX, iCloud, AOL", "Brauchen einen eigenen Server, kommen später", "Später", true) + "</div>" + personal +
-      '<div class="card" style="margin-bottom:16px"><h3>Gemeinsame Notizen</h3>' + row("Notizdienst", DEMO ? "Noch nicht ausgewählt" : "Vorerst nur auf diesem Gerät", DEMO ? "Offen" : "Lokal", true) + "</div>" +
+      '<div class="card" style="margin-bottom:16px"><h3>Gemeinsame Notizen</h3>' + row("Notizdienst", DEMO ? "Noch nicht ausgewählt" : NSB ? (N.session() ? esc((N.user() || {}).email || "") : "Nicht angemeldet") : "Vorerst nur auf diesem Gerät", DEMO ? "Offen" : NSB ? (state.nSt === "ok" ? "Verbunden" : "Getrennt") : "Lokal", !(NSB && state.nSt === "ok")) + (NSB && N.session() ? '<div class="btns" style="margin-top:8px"><button class="btn ghost" data-nlogout="1">Von Notizen abmelden</button></div>' : "") + "</div>" +
       '<div class="card"><h3>Darstellung</h3><div class="set-row"><div class="t" style="font-weight:700">Schriftgröße</div><div class="seg" role="group" aria-label="Schriftgröße"><button data-size="normal" aria-pressed="' + (state.size === "normal") + '">Normal</button><button data-size="gross" aria-pressed="' + (state.size === "gross") + '">Groß</button></div></div></div>';
   }
 
@@ -319,6 +350,14 @@
     if (d.day) { state.day = +d.day; return render(); }
     if (d.day === "0") { state.day = 0; return render(); }
     if (d.project) { state.project = d.project; return render(); }
+    if (d.nlogin) { state.nErr = ""; N.signIn().catch(function (err) { state.nErr = friendly(err); render(); }); return; }
+    if (d.nlogout) { N.signOut().then(function () { state.notes = []; state.projects = []; state.nSt = "idle"; render(); }); return; }
+    if (d.nreload) { return loadNotes(); }
+    if (d.delnote) {
+      if (!window.confirm("Diese Notiz wirklich löschen?")) return;
+      N.remove(d.delnote).then(loadNotes).catch(function (err) { toast("Löschen hat nicht geklappt: " + friendly(err)); });
+      return;
+    }
     if (d.size) { state.size = d.size; lsSet("tina_size", d.size); return render(); }
     if (d.send) {
       var mm = findMail(d.send), ta = document.getElementById("reply");
@@ -368,6 +407,13 @@
     }
     if (id === "noteform") {
       var txt = document.getElementById("note-text").value.trim(); if (!txt) return;
+      if (NSB) {
+        var proj0 = state.projects.filter(function (p) { return p.name === state.project; })[0]; if (!proj0) return;
+        state.nBusy = true;
+        N.add(proj0.id, txt, ownName() || (N.user() || {}).name || "").then(function () { state.nBusy = false; return loadNotes(); }).then(function () { toast("Notiz gespeichert."); })
+          .catch(function (err) { state.nBusy = false; render(); toast("Speichern hat nicht geklappt: " + friendly(err)); });
+        return;
+      }
       var note = { id: Date.now(), project: state.project, who: DEMO ? "Mama" : (ownName() || "Ich"), ts: Date.now(), text: txt };
       state.notes.unshift(note);
       if (!DEMO) lsSet("tina_notes", JSON.stringify(state.notes));
@@ -387,6 +433,11 @@
 
   /* ---------- Start ---------- */
   render();
+  if (NSB) {
+    N.onChange(function (ev) { if (ev === "SIGNED_IN" || ev === "INITIAL_SESSION") { if (state.nSt !== "ok" && state.nSt !== "loading") loadNotes(); } else if (ev === "NOTES_CHANGED") { loadNotes(); } });
+    N.init().then(function () { state.nReady = true; if (N.session()) { loadNotes(); N.watch(); } else render(); })
+      .catch(function (err) { state.nErr = friendly(err); render(); });
+  }
   if (!DEMO) {
     G.init().then(function () { state.gisReady = true; render(); })
       .catch(function (err) { state.connectErr = friendly(err); render(); });
