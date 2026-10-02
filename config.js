@@ -2,7 +2,7 @@
 window.TINA_CONFIG = {
   /* OAuth-Client-ID aus der Google Cloud Console (Typ "Webanwendung").
      Leer lassen = Demo-Modus mit Beispieldaten. */
-  GOOGLE_CLIENT_ID: "",
+  GOOGLE_CLIENT_ID: "1053724943389-apu6cmk5najdd6gfjj7ejbb5rmifh0i8.apps.googleusercontent.com",
   TIMEZONE: "Europe/Berlin",
   MAIL_DAYS: 30,   /* wie viele Tage zurück Mails geladen werden */
   MAIL_LIMIT: 15   /* wie viele Mails maximal (Gmail-Limits schonen) */
