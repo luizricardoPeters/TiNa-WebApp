@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#009879">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TiNa">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>TiNa-WebApp</title>
+<style>
+:root { color-scheme: light; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+html, body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<style>
+/* Layout: eine Spalte wie eine Handy-App. Oben Titel + Einstellungen, unten feste Tab-Leiste, Heute-Seite als Übersicht aller offenen Dinge. */
+:root {
+  --bg: #F2F5F4;
+  --surface: #FFFFFF;
+  --fg: #15282C;
+  --muted: #55696D;
+  --line: #D6DFDD;
+  --accent: #00826A;
+  --brand: #009879;
+  --accent-fg: #FFFFFF;
+  --accent-soft: #DDF1EC;
+  --warn: #A8500A;
+  --warn-soft: #FBE9D5;
+  --ok: #1E7A45;
+  --c-fam: #B4426B;
+  --c-term: #00826A;
+  --c-rech: #8A6D00;
+  --c-post: #4F6BC2;
+  --c-sonst: #6B7B7E;
+  --font-display: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
+  --font-body: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
+  --base: 17px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1F1B; --surface: #16302A; --fg: #E6F0ED; --muted: #9FB8B1; --line: #274A41;
+    --accent: #3FD0AE; --accent-fg: #04281F; --accent-soft: #1B3D34; --warn: #F0A860; --warn-soft: #3A2B18; --ok: #6FD39A;
+    --c-fam: #E987AC; --c-term: #3FD0AE; --c-rech: #E0BF4A; --c-post: #8FA6F0; --c-sonst: #9DB2B4;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1F1B; --surface: #16302A; --fg: #E6F0ED; --muted: #9FB8B1; --line: #274A41;
+  --accent: #3FD0AE; --accent-fg: #04281F; --accent-soft: #1B3D34; --warn: #F0A860; --warn-soft: #3A2B18; --ok: #6FD39A;
+  --c-fam: #E987AC; --c-term: #3FD0AE; --c-rech: #E0BF4A; --c-post: #8FA6F0; --c-sonst: #9DB2B4;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: var(--base); line-height: 1.5; padding-inline: 16px; padding-block: 0 96px; }
+body[data-size="gross"] { --base: 20px; }
+.wrap { max-width: 640px; margin-inline: auto; min-width: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 14px 10px; border-bottom: 3px solid var(--brand); margin-bottom: 16px; }
+.logo { width: 46px; height: 46px; border-radius: 12px; flex: none; }
+.top h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -.01em; }
+.icon-btn { margin-left: auto; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; }
+.icon-btn svg { width: 24px; height: 24px; }
+svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.sample { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 10px 14px; font-size: .88rem; margin-bottom: 16px; }
+.hello { display: flex; flex-direction: column; gap: 2px; margin-bottom: 18px; }
+.hello h2 { font-size: 3rem; font-weight: 700; letter-spacing: -.02em; }
+.hello p { margin: 0; color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.sec { margin-bottom: 26px; }
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.sec-head h3 { font-size: 1.2rem; font-weight: 800; }
+.link { background: none; border: 0; color: var(--accent); font-weight: 700; padding: 6px 0; min-height: 44px; }
+.list { display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-height: 56px; min-width: 0; }
+.row > .grow { flex: 1; min-width: 0; }
+.row .t { font-weight: 700; overflow-wrap: anywhere; }
+.row .s { color: var(--muted); font-size: .9rem; overflow-wrap: anywhere; }
+.time { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 3.6rem; color: var(--accent); }
+.dot { width: 12px; height: 12px; border-radius: 50%; margin-top: 7px; flex: none; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: .82rem; font-weight: 700; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--bg); }
+.chip i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.empty { color: var(--muted); padding: 14px; border: 1px dashed var(--line); border-radius: 12px; }
+
+.filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
+.filters button { flex: none; min-height: 44px; padding: 0 16px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); font-weight: 700; }
+.filters button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.unread .t::after { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); margin-left: 8px; }
+.done { opacity: .65; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.back { align-self: flex-start; }
+.mail-head h2 { font-size: 1.4rem; font-weight: 800; overflow-wrap: anywhere; }
+.mail-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.termin { background: var(--accent-soft); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.termin strong { font-family: var(--font-display); }
+label { font-weight: 700; font-size: .92rem; }
+textarea, input[type="text"], input[type="date"], input[type="time"], select { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 46px; }
+textarea { min-height: 150px; resize: vertical; }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { min-height: 48px; padding: 0 20px; border-radius: 12px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:disabled { opacity: .5; cursor: default; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-bottom: 16px; }
+.days button { min-height: 62px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 0; }
+.days button span:first-child { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.days button span:last-child { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.days button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+.days button[aria-pressed="true"] span { color: var(--accent-fg); }
+.days button.has::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+
+.note { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.note .who { font-size: .85rem; color: var(--muted); margin-top: 4px; }
+.note p { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.info { background: var(--accent-soft); border-radius: 12px; padding: 12px 14px; font-size: .92rem; }
+
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; border-bottom: 1px solid var(--line); }
+.set-row:last-child { border-bottom: 0; }
+.set-row .s { color: var(--muted); font-size: .88rem; }
+.pill { font-size: .8rem; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.pill.soon { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.seg button { min-height: 44px; padding: 0 16px; border: 0; background: var(--surface); font-weight: 700; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+
+.nav { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; z-index: 6; }
+.nav button { border: 0; background: none; min-height: 58px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--muted); font-size: .8rem; font-weight: 700; position: relative; }
+.nav button svg { width: 26px; height: 26px; }
+.nav button[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
+.nav .badge { position: absolute; top: 4px; left: calc(50% + 8px); background: var(--warn); color: #fff; font-size: .7rem; min-width: 20px; height: 20px; border-radius: 10px; display: grid; place-items: center; padding-inline: 5px; }
+.toast { position: fixed; left: 16px; right: 16px; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); max-width: 608px; margin-inline: auto; background: var(--fg); color: var(--bg); border-radius: 12px; padding: 12px 16px; z-index: 9; font-weight: 700; }
+@media (prefers-reduced-motion: no-preference) { .toast { animation: up .2s ease-out; } @keyframes up { from { transform: translateY(8px); opacity: 0; } } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <img class="logo" alt="Tina Taube" width="46" height="46" src="icons/logo-header.png">
+    <h1 id="title">Heute</h1>
+    <button class="icon-btn" data-go="settings" aria-label="Einstellungen">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+  <div class="sample">Alle Inhalte sind Beispiele. Die Verbindung zu Mail, Kalender und Notizen kommt im nächsten Schritt.</div>
+  <main id="view"></main>
+</div>
+<div id="toast" class="toast" hidden></div>
+<nav class="nav" aria-label="Hauptmenü" id="nav"></nav>
+
+<script>
+(function () {
+  var CATS = {
+    fam: { name: "Familie", color: "var(--c-fam)" },
+    term: { name: "Termine", color: "var(--c-term)" },
+    rech: { name: "Rechnungen", color: "var(--c-rech)" },
+    post: { name: "Post & Einkauf", color: "var(--c-post)" },
+    sonst: { name: "Sonstiges", color: "var(--c-sonst)" }
+  };
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  function addDays(n) { var d = new Date(today); d.setDate(d.getDate() + n); return d; }
+  function key(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function fmt(d, o) { return new Intl.DateTimeFormat("de-DE", o).format(d); }
+  function longDay(d) { return fmt(d, { weekday: "long", day: "numeric", month: "long" }); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+
+  var dentist = addDays(6);
+  var state = {
+    tab: "home", openMail: null, filter: "alle", day: 0, project: "Familie", size: "normal",
+    mails: [
+      { id: 1, from: "Anna (Tochter)", subj: "Sonntag zum Kaffee?", cat: "fam", answered: false, unread: true,
+        body: "Hallo Mama,\n\nhättest du am Sonntag Lust, bei uns zum Kaffee vorbeizukommen? Die Kinder würden sich sehr freuen. Wir backen auch einen Kuchen.\n\nLiebe Grüße\nAnna",
+        reply: "Liebe Anna,\n\nsehr gerne, ich komme am Sonntag zum Kaffee. Soll ich etwas mitbringen?\n\nLiebe Grüße\nMama" },
+      { id: 2, from: "Zahnarztpraxis Dr. Weber", subj: "Terminerinnerung", cat: "term", answered: false, unread: true,
+        body: "Sehr geehrte Patientin,\n\nwir erinnern Sie an Ihren Termin am " + longDay(dentist) + " um 15:30 Uhr zur Kontrolluntersuchung.\n\nBitte geben Sie uns Bescheid, falls Sie den Termin nicht wahrnehmen können.\n\nIhre Praxis Dr. Weber",
+        termin: { title: "Zahnarzt Kontrolle", date: key(dentist), time: "15:30", place: "Praxis Dr. Weber" },
+        reply: "Sehr geehrte Damen und Herren,\n\nvielen Dank für die Erinnerung. Ich werde den Termin wahrnehmen.\n\nMit freundlichen Grüßen" },
+      { id: 3, from: "Stadtwerke", subj: "Ihre Jahresabrechnung", cat: "rech", answered: false, unread: false,
+        body: "Sehr geehrte Kundin,\n\nIhre Jahresabrechnung liegt im Kundenportal bereit. Ein Guthaben wird in den nächsten Tagen überwiesen.\n\nIhre Stadtwerke",
+        reply: "Sehr geehrte Damen und Herren,\n\nvielen Dank für die Information. Die Abrechnung habe ich zur Kenntnis genommen.\n\nMit freundlichen Grüßen" },
+      { id: 4, from: "Renate", subj: "Spaziergang am Samstag", cat: "fam", answered: false, unread: true,
+        body: "Liebe Freundin,\n\nwollen wir am Samstag um 10 Uhr zusammen eine Runde im Park drehen? Das Wetter soll gut werden.\n\nHerzlich\nRenate",
+        termin: { title: "Spaziergang mit Renate", date: key(addDays(1)), time: "10:00", place: "Stadtpark" },
+        reply: "Liebe Renate,\n\ngerne, Samstag um 10 Uhr passt gut. Treffen wir uns am Parkeingang?\n\nHerzlich" },
+      { id: 5, from: "Versandhaus Lindner", subj: "Ihr Paket ist unterwegs", cat: "post", answered: true, unread: false,
+        body: "Ihr Paket wurde versendet und wird voraussichtlich in drei Tagen zugestellt.", reply: "" }
+    ],
+    events: [
+      { d: 0, time: "09:30", title: "Physiotherapie", place: "Praxis Müller", src: "Google" },
+      { d: 0, time: "15:00", title: "Kaffee mit Nachbarin", place: "Zuhause", src: "iPhone" },
+      { d: 1, time: "10:00", title: "Wochenmarkt", place: "Marktplatz", src: "Google" },
+      { d: 2, time: "14:30", title: "Kaffee bei Anna", place: "Annas Wohnung", src: "Google" },
+      { d: 4, time: "11:00", title: "Friseur", place: "Salon Roth", src: "iPhone" }
+    ],
+    notes: [
+      { id: 1, project: "Familie", who: "Anna", when: "heute, 09:12", text: "Geburtstagsgeschenk für Opa: Gutschein oder lieber ein Buch?" },
+      { id: 2, project: "Familie", who: "Mama", when: "gestern", text: "Sonntagskuchen: Apfel- oder Zwetschgenkuchen?" },
+      { id: 3, project: "Haushalt", who: "Papa", when: "heute, 08:40", text: "Heizung: Wartungstermin im Oktober vereinbaren." },
+      { id: 4, project: "Urlaub", who: "Anna", when: "Montag", text: "Ferienhaus Nordsee: drei Angebote verglichen, Liste folgt." }
+    ]
+  };
+  state.events.forEach(function (e) { e.date = key(addDays(e.d)); });
+  var PROJECTS = ["Familie", "Haushalt", "Urlaub"];
+
+  var $view = document.getElementById("view"), $nav = document.getElementById("nav"), $title = document.getElementById("title"), $toast = document.getElementById("toast"), tt;
+  function toast(msg) { $toast.textContent = msg; $toast.hidden = false; clearTimeout(tt); tt = setTimeout(function () { $toast.hidden = true; }, 3200); }
+
+  var ICON = {
+    home: '<svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
+    mail: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+    cal: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>',
+    proj: '<svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 11h8M8 15h8"/></svg>'
+  };
+  var TABS = [["home", "Heute"], ["mail", "E-Mail"], ["cal", "Kalender"], ["proj", "Projekte"]];
+  var TITLES = { home: "Heute", mail: "E-Mail", cal: "Kalender", proj: "Projekte", settings: "Einstellungen" };
+
+  function openCount() { return state.mails.filter(function (m) { return !m.answered; }).length; }
+  function dayEvents(d) { return state.events.filter(function (e) { return e.date === key(addDays(d)); }).sort(function (a, b) { return a.time < b.time ? -1 : 1; }); }
+  function catChip(c) { return '<span class="chip"><i style="background:' + CATS[c].color + '"></i>' + CATS[c].name + "</span>"; }
+
+  function mailRow(m) {
+    return '<button class="row' + (m.unread && !m.answered ? " unread" : "") + (m.answered ? " done" : "") + '" data-mail="' + m.id + '">' +
+      '<span class="dot" style="background:' + CATS[m.cat].color + '"></span><span class="grow"><div class="t">' + esc(m.from) + '</div><div class="s">' + esc(m.subj) + (m.answered ? " · beantwortet" : "") + "</div></span></button>";
+  }
+  function eventRow(e, showDay) {
+    return '<div class="row"><span class="time">' + e.time + '</span><span class="grow"><div class="t">' + esc(e.title) + '</div><div class="s">' + (showDay ? fmt(addDays(e.d), { weekday: "short", day: "numeric", month: "numeric" }) + " · " : "") + esc(e.place) + " · " + e.src + "-Kalender</div></span></div>";
+  }
+  function noteCard(n) {
+    return '<div class="note"><p>' + esc(n.text) + '</p><div class="who">' + esc(n.who) + " · " + n.when + " · " + esc(n.project) + "</div></div>";
+  }
+
+  function home() {
+    var open = state.mails.filter(function (m) { return !m.answered; });
+    var ev = dayEvents(0);
+    var fresh = state.notes.filter(function (n) { return /heute/.test(n.when); });
+    return '<div class="hello"><h2>Heute</h2><p>' + longDay(today) + "</p></div>" +
+      '<section class="sec"><div class="sec-head"><h3>Noch zu beantworten (' + open.length + ')</h3><button class="link" data-go="mail">Alle E-Mails</button></div><div class="list">' +
+      (open.length ? open.slice(0, 3).map(mailRow).join("") : '<div class="empty">Alles beantwortet.</div>') + "</div></section>" +
+      '<section class="sec"><div class="sec-head"><h3>Heute im Kalender</h3><button class="link" data-go="cal">Kalender</button></div><div class="list">' +
+      (ev.length ? ev.map(function (e) { return eventRow(e, false); }).join("") : '<div class="empty">Heute stehen keine Termine an.</div>') + "</div></section>" +
+      '<section class="sec"><div class="sec-head"><h3>Neue Notizen</h3><button class="link" data-go="proj">Projekte</button></div><div class="list">' +
+      (fresh.length ? fresh.map(noteCard).join("") : '<div class="empty">Heute hat noch niemand etwas notiert.</div>') + "</div></section>";
+  }
+
+  function mail() {
+    if (state.openMail) {
+      var m = state.mails.filter(function (x) { return x.id === state.openMail; })[0];
+      var t = m.termin ? '<div class="termin"><strong>Termin erkannt</strong><div>' + esc(m.termin.title) + ", " + longDay(new Date(m.termin.date + "T00:00")) + " um " + m.termin.time + ' Uhr</div><div class="btns"><button class="btn" data-addtermin="' + m.id + '">In Kalender eintragen</button></div></div>' : "";
+      return '<div class="card"><button class="link back" data-back="1">‹ Zurück zur Liste</button><div class="mail-head">' + catChip(m.cat) + '<h2 style="margin-top:8px">' + esc(m.subj) + '</h2><div class="s" style="color:var(--muted)">von ' + esc(m.from) + '</div></div><div class="mail-body">' + esc(m.body) + "</div>" + t +
+        (m.answered ? '<div class="info">Diese E-Mail ist beantwortet.</div>' :
+          '<label for="reply">Vorgeschlagene Antwort (bitte prüfen und bei Bedarf ändern)</label><textarea id="reply">' + esc(m.reply) + '</textarea><div class="btns"><button class="btn" data-send="' + m.id + '">Antwort senden</button><button class="btn ghost" data-back="1">Später</button></div>') + "</div>";
+    }
+    var f = ["alle"].concat(Object.keys(CATS));
+    var list = state.mails.filter(function (m) { return state.filter === "alle" || m.cat === state.filter; });
+    return '<div class="filters" role="group" aria-label="Kategorien">' + f.map(function (k) { return '<button data-filter="' + k + '" aria-pressed="' + (state.filter === k) + '">' + (k === "alle" ? "Alle" : CATS[k].name) + "</button>"; }).join("") + '</div><div class="list">' +
+      (list.length ? list.map(mailRow).join("") : '<div class="empty">In dieser Kategorie liegt nichts.</div>') + "</div>";
+  }
+
+  function cal() {
+    var strip = "";
+    for (var i = 0; i < 7; i++) {
+      var d = addDays(i);
+      strip += '<button data-day="' + i + '" aria-pressed="' + (state.day === i) + '" class="' + (dayEvents(i).length ? "has" : "") + '" aria-label="' + longDay(d) + '"><span>' + fmt(d, { weekday: "short" }) + "</span><span>" + d.getDate() + "</span></button>";
+    }
+    var ev = dayEvents(state.day);
+    return '<div class="days">' + strip + '</div><div class="sec-head"><h3>' + longDay(addDays(state.day)) + '</h3></div><div class="list" style="margin-bottom:24px">' +
+      (ev.length ? ev.map(function (e) { return eventRow(e, false); }).join("") : '<div class="empty">An diesem Tag steht nichts an.</div>') + "</div>" +
+      '<form class="card" id="evform"><h3>Neuen Termin eintragen</h3><div><label for="ev-title">Was?</label><input type="text" id="ev-title" required placeholder="z. B. Friseur"></div><div class="fields"><div><label for="ev-date">Tag</label><input type="date" id="ev-date" value="' + key(addDays(state.day)) + '" required></div><div><label for="ev-time">Uhrzeit</label><input type="time" id="ev-time" value="10:00" required></div></div><div class="btns"><button class="btn" type="submit">Termin speichern</button></div></form>';
+  }
+
+  function proj() {
+    var notes = state.notes.filter(function (n) { return n.project === state.project; });
+    return '<div class="filters" role="group" aria-label="Projekte">' + PROJECTS.map(function (p) { return '<button data-project="' + p + '" aria-pressed="' + (state.project === p) + '">' + p + "</button>"; }).join("") + '</div>' +
+      '<div class="info" style="margin-bottom:16px">Hier erscheinen die gemeinsamen Notizen aus dem Projektordner. Welcher Notizdienst dahinter liegt, ist noch offen (siehe Einstellungen).</div><div class="list" style="margin-bottom:20px">' +
+      (notes.length ? notes.map(noteCard).join("") : '<div class="empty">In diesem Projekt gibt es noch keine Notizen.</div>') + "</div>" +
+      '<form class="card" id="noteform"><label for="note-text">Neue Notiz für ' + esc(state.project) + '</label><textarea id="note-text" required placeholder="Was soll die Familie wissen?" style="min-height:100px"></textarea><div class="btns"><button class="btn" type="submit">Notiz speichern</button></div></form>';
+  }
+
+  function settings() {
+    function row(t, s, p, soon) { return '<div class="set-row"><div><div class="t" style="font-weight:700">' + t + '</div><div class="s">' + s + '</div></div><span class="pill' + (soon ? " soon" : "") + '">' + p + "</span></div>"; }
+    return '<div class="card" style="margin-bottom:16px"><h3>E-Mail-Konten</h3>' + row("Gmail", "Wird im nächsten Schritt verbunden", "Geplant", false) + row("GMX, iCloud, AOL", "Folgen, sobald Gmail läuft", "Später", true) + "</div>" +
+      '<div class="card" style="margin-bottom:16px"><h3>Kalender</h3>' + row("Google Kalender", "Wird zusammen mit Gmail verbunden", "Geplant", false) + row("iPhone- und Android-Kalender", "Je nach Gerät später möglich", "Später", true) + "</div>" +
+      '<div class="card" style="margin-bottom:16px"><h3>Gemeinsame Notizen</h3>' + row("Notizdienst", "Noch nicht ausgewählt", "Offen", true) + "</div>" +
+      '<div class="card"><h3>Darstellung</h3><div class="set-row"><div class="t" style="font-weight:700">Schriftgröße</div><div class="seg" role="group" aria-label="Schriftgröße"><button data-size="normal" aria-pressed="' + (state.size === "normal") + '">Normal</button><button data-size="gross" aria-pressed="' + (state.size === "gross") + '">Groß</button></div></div></div>';
+  }
+
+  function render() {
+    $title.textContent = TITLES[state.tab]; $title.hidden = state.tab === "home";
+    document.body.setAttribute("data-size", state.size);
+    $view.innerHTML = { home: home, mail: mail, cal: cal, proj: proj, settings: settings }[state.tab]();
+    $nav.innerHTML = TABS.map(function (t) {
+      return '<button data-go="' + t[0] + '"' + (state.tab === t[0] ? ' aria-current="page"' : "") + ">" + ICON[t[0]] + "<span>" + t[1] + "</span>" + (t[0] === "mail" && openCount() ? '<span class="badge">' + openCount() + "</span>" : "") + "</button>";
+    }).join("");
+  }
+  function go(tab) { state.tab = tab; state.openMail = null; render(); window.scrollTo(0, 0); }
+
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    var d = b.dataset;
+    if (d.go) return go(d.go);
+    if (d.mail) { state.tab = "mail"; state.openMail = +d.mail; var m = state.mails.filter(function (x) { return x.id === +d.mail; })[0]; m.unread = false; render(); return window.scrollTo(0, 0); }
+    if (d.back) { state.openMail = null; return render(); }
+    if (d.filter) { state.filter = d.filter; return render(); }
+    if (d.day) { state.day = +d.day; return render(); }
+    if (d.day === "0") { state.day = 0; return render(); }
+    if (d.project) { state.project = d.project; return render(); }
+    if (d.size) { state.size = d.size; return render(); }
+    if (d.send) {
+      var mm = state.mails.filter(function (x) { return x.id === +d.send; })[0];
+      mm.reply = document.getElementById("reply").value; mm.answered = true; state.openMail = null; render();
+      return toast("Beispiel: Hier würde die Antwort an " + mm.from + " gesendet.");
+    }
+    if (d.addtermin) {
+      var t = state.mails.filter(function (x) { return x.id === +d.addtermin; })[0].termin;
+      var diff = Math.round((new Date(t.date + "T00:00") - today) / 864e5);
+      state.events.push({ d: diff, date: t.date, time: t.time, title: t.title, place: t.place, src: "Google" });
+      b.disabled = true; b.textContent = "Eingetragen";
+      return toast("Termin im Kalender eingetragen: " + t.title);
+    }
+  });
+
+  document.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (e.target.id === "evform") {
+      var date = document.getElementById("ev-date").value, time = document.getElementById("ev-time").value, title = document.getElementById("ev-title").value.trim();
+      var diff = Math.round((new Date(date + "T00:00") - today) / 864e5);
+      state.events.push({ d: diff, date: date, time: time, title: title, place: "Eigener Eintrag", src: "Google" });
+      if (diff >= 0 && diff < 7) state.day = diff;
+      render(); toast("Termin gespeichert.");
+    }
+    if (e.target.id === "noteform") {
+      var txt = document.getElementById("note-text").value.trim(); if (!txt) return;
+      state.notes.unshift({ id: Date.now(), project: state.project, who: "Mama", when: "heute, " + fmt(new Date(), { hour: "2-digit", minute: "2-digit" }), text: txt });
+      render(); toast("Notiz gespeichert.");
+    }
+  });
+  render();
+})();
+</script>
+
+</body>
+</html>

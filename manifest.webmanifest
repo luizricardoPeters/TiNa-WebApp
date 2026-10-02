@@ -1,0 +1,23 @@
+{
+  "name": "TiNa-WebApp",
+  "short_name": "TiNa",
+  "description": "Alltags-App für TiNa macht Schule",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "lang": "de",
+  "background_color": "#F2F6F4",
+  "theme_color": "#009879",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
