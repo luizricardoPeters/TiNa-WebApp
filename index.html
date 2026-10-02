@@ -112,7 +112,10 @@ textarea { min-height: 150px; resize: vertical; }
 .btn { min-height: 48px; padding: 0 20px; border-radius: 12px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); font-weight: 700; }
 .btn.ghost { background: transparent; color: var(--accent); }
 .btn:disabled { opacity: .5; cursor: default; }
-.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fields > * { min-width: 0; }
+input[type="date"], input[type="time"] { box-sizing: border-box; display: block; min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; text-align: left; }
+input[type="date"]::-webkit-date-and-time-value, input[type="time"]::-webkit-date-and-time-value { text-align: left; min-width: 0; }
 
 .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-bottom: 16px; }
 .days button { min-height: 62px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 0; }
@@ -167,11 +170,11 @@ textarea { min-height: 150px; resize: vertical; }
 /* Zoom sperren (iOS ignoriert user-scalable): Pinch-Gesten abfangen */
 ["gesturestart","gesturechange","gestureend"].forEach(function (e) { document.addEventListener(e, function (ev) { ev.preventDefault(); }); });
 </script>
-<script src="config.js?v=20261002g"></script>
-<script src="mail-logic.js?v=20261002g"></script>
-<script src="google.js?v=20261002g"></script>
-<script src="notes.js?v=20261002g"></script>
-<script src="app.js?v=20261002g"></script>
+<script src="config.js?v=20261002h"></script>
+<script src="mail-logic.js?v=20261002h"></script>
+<script src="google.js?v=20261002h"></script>
+<script src="notes.js?v=20261002h"></script>
+<script src="app.js?v=20261002h"></script>
 
 </body>
 </html>
