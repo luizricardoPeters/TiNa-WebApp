@@ -45,7 +45,7 @@
   function volunteers() { return sb.from("volunteers").select("id,name,task,contact").order("name").then(must); }
   function addVolunteers(rows) { return sb.from("volunteers").insert(rows).then(must); }
   function removeVolunteer(id) { return sb.from("volunteers").delete().eq("id", id).then(must); }
-  function perms() { return sb.from("allowed_users").select("can_mail,is_admin").maybeSingle().then(must); }
+  function perms() { return sb.from("allowed_users").select("role,can_mail,can_edit_cal,is_admin").maybeSingle().then(must); }
   function invoke(name, body) {
     return sb.functions.invoke(name, { body: body }).then(function (r) {
       if (!r.error) return r.data;

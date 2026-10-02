@@ -114,10 +114,10 @@
   /* Gemeinschaftspostfach (über Supabase) und optional das eigene Gmail */
   function mailShared() { return !DEMO && NSB && N.session() && !!state.perms && !!(state.perms.can_mail || state.perms.is_admin); }
   function mailPersonal() { return !DEMO && ready() && G.has("mail") && (!NSB || mailShared()); }
-  function canAddEvent() { return DEMO || (NSB ? N.session() : (ready() && G.has("cal"))); }
+  function canAddEvent() { return DEMO || (NSB ? !!(N.session() && state.perms && (state.perms.can_edit_cal || state.perms.is_admin)) : (ready() && G.has("cal"))); }
   function ensurePerms() {
     if (state.perms) return Promise.resolve();
-    return N.perms().then(function (p) { state.perms = p || { can_mail: false, is_admin: false }; }).catch(function () { state.perms = { can_mail: false, is_admin: false }; });
+    return N.perms().then(function (p) { state.perms = p || { can_mail: false, can_edit_cal: false, is_admin: false }; }).catch(function () { state.perms = { can_mail: false, can_edit_cal: false, is_admin: false }; });
   }
   function createEv(o) {
     if (NSB) return N.invoke("shared", { action: "cal.create", title: o.title, date: o.date, time: o.time, place: o.place }).then(function () { return { date: o.date, time: o.time || null, title: o.title, place: o.place || "", src: "Gemeinschaftskalender" }; });
@@ -206,6 +206,7 @@
     proj: '<svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 11h8M8 15h8"/></svg>',
     team: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.9 0 5 2.2 5 5.8"/></svg>'
   };
+  var ROLES = { admin: "Admin", postfach: "Postfach", mitarbeit: "Mitarbeit", ehrenamt: "Ehrenamtlich" };
   var TABS = [["home", "Heute"], ["mail", "E-Mail"], ["cal", "Kalender"], ["proj", "Nachrichten"], ["team", "Team"]];
   var TITLES = { home: "Heute", mail: "E-Mail", cal: "Kalender", proj: "Nachrichten", team: "Team", settings: "Einstellungen" };
 
@@ -284,8 +285,9 @@
       (stateBox(state.mailSt, state.mailErr, NOMAIL) || (open.length ? open.slice(0, 3).map(mailRow).join("") : '<div class="empty">' + (state.mailSt === "ok" || DEMO ? "Alles beantwortet." : "Noch keine E-Mails geladen.") + "</div>"));
     var calBox = cg ? '<div class="empty">Nach der Anmeldung erscheinen hier die Termine von heute.</div>' :
       (stateBox(state.calSt, state.calErr, NOCAL) || (ev.length ? ev.map(eventRow).join("") : '<div class="empty">Heute stehen keine Termine an.</div>'));
-    return head +
-      '<section class="sec"><div class="sec-head"><h3>Noch zu beantworten' + (state.mailSt === "ok" || DEMO ? " (" + open.length + ")" : "") + '</h3><button class="link" data-go="mail">Alle E-Mails</button></div><div class="list">' + mailBox + "</div></section>" +
+    var noMail = NSB && !DEMO && state.perms && !mailShared() && !mailPersonal();
+    return head + (noMail ? "" :
+      '<section class="sec"><div class="sec-head"><h3>Noch zu beantworten' + (state.mailSt === "ok" || DEMO ? " (" + open.length + ")" : "") + '</h3><button class="link" data-go="mail">Alle E-Mails</button></div><div class="list">' + mailBox + "</div></section>") +
       '<section class="sec"><div class="sec-head"><h3>Heute im Kalender</h3><button class="link" data-go="cal">Kalender</button></div><div class="list">' + calBox + "</div></section>" +
       '<section class="sec"><div class="sec-head"><h3>Neue Notizen</h3><button class="link" data-go="proj">Nachrichten</button></div><div class="list">' +
       (fresh.length ? fresh.map(noteCard).join("") : '<div class="empty">Heute hat noch niemand etwas notiert.</div>') + "</div></section>";
@@ -337,7 +339,7 @@
     return pre + stateBox(state.calSt, state.calErr, NOCAL) + (state.calNote ? '<div class="info" style="margin-bottom:12px">' + esc(state.calNote) + "</div>" : "") +
       '<div class="days">' + strip + '</div><div class="sec-head"><h3>' + longDay(addDays(state.day)) + '</h3></div><div class="list" style="margin-bottom:24px">' +
       (ev.length ? ev.map(eventRow).join("") : '<div class="empty">An diesem Tag steht nichts an.</div>') + "</div>" +
-      '<form class="card" id="evform"><h3>Neuen Termin eintragen</h3><div><label for="ev-title">Was?</label><input type="text" id="ev-title" required placeholder="z. B. Friseur"></div><div class="fields"><div><label for="ev-date">Tag</label><input type="date" id="ev-date" value="' + key(addDays(state.day)) + '" required></div><div><label for="ev-time">Uhrzeit</label><input type="time" id="ev-time" value="10:00" required></div></div><div class="btns"><button class="btn" type="submit"' + (canAdd ? "" : " disabled") + ">Termin speichern</button></div></form>";
+      (!canAdd && NSB && !DEMO && state.perms ? '<div class="info">Du kannst den Kalender ansehen. Termine eintragen dürfen nur Mitarbeitende.</div>' : '<form class="card" id="evform"><h3>Neuen Termin eintragen</h3><div><label for="ev-title">Was?</label><input type="text" id="ev-title" required placeholder="z. B. Friseur"></div><div class="fields"><div><label for="ev-date">Tag</label><input type="date" id="ev-date" value="' + key(addDays(state.day)) + '" required></div><div><label for="ev-time">Uhrzeit</label><input type="time" id="ev-time" value="10:00" required></div></div><div class="btns"><button class="btn" type="submit"' + (canAdd ? "" : " disabled") + ">Termin speichern</button></div></form>");
   }
 
   function proj() {
@@ -356,7 +358,7 @@
     return '<div class="filters" role="group" aria-label="Gruppen">' + projectNames().map(function (p) { return '<button data-project="' + esc(p) + '" aria-pressed="' + (state.project === p) + '">' + esc(p) + "</button>"; }).join("") + "</div>" +
       '<div class="info" style="margin-bottom:16px">' + (DEMO ? "Hier erscheinen die gemeinsamen Notizen aus dem Projektordner." : NSB ? "Gemeinsame Notizen: alle freigeschalteten Personen sehen sie sofort." : "Diese Notizen liegen vorerst nur auf diesem Gerät.") + '</div><div class="list" style="margin-bottom:20px">' +
       (notes.length ? notes.map(noteCard).join("") : '<div class="empty">In diesem Projekt gibt es noch keine Notizen.</div>') + "</div>" +
-      '<form class="card" id="noteform"><label for="note-text">Neue Notiz für ' + esc(state.project) + '</label><textarea id="note-text" required placeholder="Was soll das Team wissen?" style="min-height:100px"></textarea><div class="btns"><button class="btn" type="submit"' + (state.nBusy ? " disabled" : "") + ">Notiz speichern</button></div></form>";
+      '<form class="card" id="noteform"><label for="note-text">Neue Notiz für ' + esc(state.project) + '</label><textarea id="note-text" required placeholder="Was soll das Team wissen? Mit #alle erscheint die Notiz auch in Allgemein." style="min-height:100px"></textarea><div class="btns"><button class="btn" type="submit"' + (state.nBusy ? " disabled" : "") + ">Notiz speichern</button></div></form>";
   }
 
   function volMatches(v) {
@@ -393,7 +395,8 @@
       var pm = state.perms || {};
       google = '<div class="card" style="margin-bottom:16px"><h3>Deine Rechte</h3>' +
         row("Angemeldet als", esc((N.user() || {}).email || "nicht angemeldet"), N.session() ? "Ja" : "Nein", !N.session()) +
-        row("Gemeinschaftskalender", "Ansehen und Termine eintragen", N.session() ? "Ja" : "Nein", !N.session()) +
+        row("Rolle", "Bestimmt, was du in der App siehst", esc(ROLES[pm.role] || "–"), false) +
+        row("Gemeinschaftskalender", pm.can_edit_cal || pm.is_admin ? "Ansehen und Termine eintragen" : "Nur ansehen", N.session() ? "Ja" : "Nein", !N.session()) +
         row("Gemeinschaftspostfach", "E-Mails lesen und beantworten", pm.can_mail || pm.is_admin ? "Ja" : "Nein", !(pm.can_mail || pm.is_admin)) +
         (pm.is_admin ? row("Verwaltung", "Gemeinschaftskonto verbinden", "Admin", false) : "") +
         '<div class="btns" style="margin-top:8px"><button class="btn ghost" data-refresh="1">Neu laden</button></div></div>';
@@ -436,11 +439,39 @@
       if (DEMO) $sample.textContent = "Alle Inhalte sind Beispiele. Sobald in config.js eine Google-Client-ID steht, zeigt die App deine echten E-Mails und Termine.";
     }
     document.body.setAttribute("data-size", state.size);
-    $view.innerHTML = { home: home, mail: mail, cal: cal, proj: proj, team: team, settings: settings }[state.tab]();
+    var tabs = visibleTabs(), gate = gateView();
+    if (!gate && state.tab === "mail" && !tabs.some(function (t) { return t[0] === "mail"; })) state.tab = "home";
+    $view.innerHTML = gate || { home: home, mail: mail, cal: cal, proj: proj, team: team, settings: settings }[state.tab]();
     var n = openMails().length;
-    $nav.innerHTML = TABS.map(function (t) {
+    $nav.hidden = !tabs.length;
+    $nav.innerHTML = tabs.map(function (t) {
       return '<button data-go="' + t[0] + '"' + (state.tab === t[0] ? ' aria-current="page"' : "") + ">" + ICON[t[0]] + "<span>" + t[1] + "</span>" + (t[0] === "mail" && n ? '<span class="badge">' + n + "</span>" : "") + "</button>";
     }).join("");
+  }
+  /* #alle = Gruppe „Allgemein"; #Gruppenname kopiert die Notiz in jede Gruppe, die du sehen darfst */
+  function hashTargets(txt, cur) {
+    var out = [cur], tags = txt.match(/#[\p{L}\d_-]+/gu) || [];
+    tags.forEach(function (t) {
+      var k = t.slice(1).toLowerCase(); if (k === "alle") k = "allgemein";
+      state.projects.forEach(function (p) {
+        if (p.name.toLowerCase().replace(/\s+/g, "") === k && !out.some(function (o) { return o.id === p.id; })) out.push(p);
+      });
+    });
+    return out;
+  }
+  function visibleTabs() {
+    if (DEMO || !NSB) return TABS;
+    if (!N.session() || state.nSt === "denied") return [];
+    return TABS.filter(function (t) { return t[0] !== "mail" || !state.perms || mailShared(); });
+  }
+  function gateView() {
+    if (DEMO || !NSB) return null;
+    if (!N.session()) return '<div class="hello"><h2>Willkommen</h2><p>TiNa macht Schule</p></div>' + loginCard();
+    if (state.nSt === "denied") {
+      var u = N.user();
+      return '<div class="card"><h3>Noch nicht freigeschaltet</h3><div>Die Adresse ' + esc(u ? u.email : "") + ' ist nicht für die App eingetragen. Bitte beim Betreiber freischalten lassen.</div><div class="btns"><button class="btn ghost" data-nlogout="1">Abmelden</button></div></div>';
+    }
+    return null;
   }
   function go(tab) { state.tab = tab; state.openMail = null; state.confirmSend = null; state.sendErr = ""; render(); window.scrollTo(0, 0); }
 
@@ -541,8 +572,10 @@
       var txt = document.getElementById("note-text").value.trim(); if (!txt) return;
       if (NSB) {
         var proj0 = state.projects.filter(function (p) { return p.name === state.project; })[0]; if (!proj0) return;
+        var targets = hashTargets(txt, proj0), who = ownName() || (N.user() || {}).name || "";
         state.nBusy = true;
-        N.add(proj0.id, txt, ownName() || (N.user() || {}).name || "").then(function () { state.nBusy = false; return loadNotes(); }).then(function () { toast("Notiz gespeichert."); })
+        Promise.all(targets.map(function (t) { return N.add(t.id, txt, who); })).then(function () { state.nBusy = false; return loadNotes(); })
+          .then(function () { toast(targets.length > 1 ? "Notiz gespeichert, auch in: " + targets.slice(1).map(function (t) { return t.name; }).join(", ") : "Notiz gespeichert."); })
           .catch(function (err) { state.nBusy = false; render(); toast("Speichern hat nicht geklappt: " + friendly(err)); });
         return;
       }

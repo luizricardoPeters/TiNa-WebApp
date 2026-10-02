@@ -47,12 +47,14 @@ Deno.serve(async (req) => {
     if (!email) return json({ error: "Nicht angemeldet." }, 401);
 
     const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: perm } = await admin.from("allowed_users").select("can_mail,is_admin").eq("email", email).maybeSingle();
+    const { data: perm } = await admin.from("allowed_users").select("can_mail,can_edit_cal,is_admin").eq("email", email).maybeSingle();
     if (!perm) return json({ error: "Diese Adresse ist nicht freigeschaltet." }, 403);
 
     const b = await req.json();
     const needMail = String(b.action).startsWith("mail.");
     if (needMail && !perm.can_mail && !perm.is_admin) return json({ error: "Kein Zugriff auf das Postfach." }, 403);
+
+    if (b.action === "cal.create" && !perm.can_edit_cal && !perm.is_admin) return json({ error: "Du darfst keine Termine eintragen." }, 403);
 
     const token = await accessToken(admin);
 
