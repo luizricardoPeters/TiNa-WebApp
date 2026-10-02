@@ -206,7 +206,7 @@
     proj: '<svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 11h8M8 15h8"/></svg>',
     team: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.9 0 5 2.2 5 5.8"/></svg>'
   };
-  var ROLES = { admin: "Admin", postfach: "Postfach", mitarbeit: "Mitarbeit", ehrenamt: "Ehrenamtlich" };
+  var ROLES = { admin: "Admin", fuehrung: "Führungskraft", mitarbeiter: "Mitarbeiter", ehrenamt: "Ehrenamtler" };
   var TABS = [["home", "Heute"], ["mail", "E-Mail"], ["cal", "Kalender"], ["proj", "Nachrichten"], ["team", "Team"]];
   var TITLES = { home: "Heute", mail: "E-Mail", cal: "Kalender", proj: "Nachrichten", team: "Team", settings: "Einstellungen" };
 
@@ -339,7 +339,7 @@
     return pre + stateBox(state.calSt, state.calErr, NOCAL) + (state.calNote ? '<div class="info" style="margin-bottom:12px">' + esc(state.calNote) + "</div>" : "") +
       '<div class="days">' + strip + '</div><div class="sec-head"><h3>' + longDay(addDays(state.day)) + '</h3></div><div class="list" style="margin-bottom:24px">' +
       (ev.length ? ev.map(eventRow).join("") : '<div class="empty">An diesem Tag steht nichts an.</div>') + "</div>" +
-      (!canAdd && NSB && !DEMO && state.perms ? '<div class="info">Du kannst den Kalender ansehen. Termine eintragen dürfen nur Mitarbeitende.</div>' : '<form class="card" id="evform"><h3>Neuen Termin eintragen</h3><div><label for="ev-title">Was?</label><input type="text" id="ev-title" required placeholder="z. B. Friseur"></div><div class="fields"><div><label for="ev-date">Tag</label><input type="date" id="ev-date" value="' + key(addDays(state.day)) + '" required></div><div><label for="ev-time">Uhrzeit</label><input type="time" id="ev-time" value="10:00" required></div></div><div class="btns"><button class="btn" type="submit"' + (canAdd ? "" : " disabled") + ">Termin speichern</button></div></form>");
+      (!canAdd && NSB && !DEMO && state.perms ? '<div class="info">Du kannst den Kalender ansehen. Termine eintragen dürfen nur Mitarbeiter und Führungskräfte.</div>' : '<form class="card" id="evform"><h3>Neuen Termin eintragen</h3><div><label for="ev-title">Was?</label><input type="text" id="ev-title" required placeholder="z. B. Friseur"></div><div class="fields"><div><label for="ev-date">Tag</label><input type="date" id="ev-date" value="' + key(addDays(state.day)) + '" required></div><div><label for="ev-time">Uhrzeit</label><input type="time" id="ev-time" value="10:00" required></div></div><div class="btns"><button class="btn" type="submit"' + (canAdd ? "" : " disabled") + ">Termin speichern</button></div></form>");
   }
 
   function proj() {

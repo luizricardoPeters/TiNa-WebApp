@@ -1,9 +1,9 @@
 -- Rollen pro E-Mail-Adresse. Im SQL Editor ausführen.
--- admin = alles | postfach = Postfach + Kalender (eintragen) + Notizen
--- mitarbeit = Kalender (eintragen) + Notizen | ehrenamt = Kalender (nur ansehen) + Notizen
-alter table public.allowed_users add column if not exists role text not null default 'mitarbeit';
+-- admin = alles | fuehrung = Führungskraft: Postfach + Kalender (eintragen) + Notizen
+-- mitarbeiter = Kalender (eintragen) + Notizen | ehrenamt = Ehrenamtler: Kalender (nur ansehen) + Notizen
+alter table public.allowed_users add column if not exists role text not null default 'mitarbeiter';
 alter table public.allowed_users drop constraint if exists allowed_users_role_check;
-alter table public.allowed_users add constraint allowed_users_role_check check (role in ('admin','postfach','mitarbeit','ehrenamt'));
+alter table public.allowed_users add constraint allowed_users_role_check check (role in ('admin','fuehrung','mitarbeiter','ehrenamt'));
 alter table public.allowed_users add column if not exists can_edit_cal boolean not null default false;
 
 -- Die Rolle bestimmt die Einzelrechte automatisch.
@@ -11,20 +11,20 @@ create or replace function public.apply_role() returns trigger language plpgsql 
 begin
   new.email := lower(new.email);
   new.is_admin := new.role = 'admin';
-  new.can_mail := new.role in ('admin','postfach');
-  new.can_edit_cal := new.role in ('admin','postfach','mitarbeit');
+  new.can_mail := new.role in ('admin','fuehrung');
+  new.can_edit_cal := new.role in ('admin','fuehrung','mitarbeiter');
   return new;
 end $$;
 drop trigger if exists apply_role on public.allowed_users;
 create trigger apply_role before insert or update on public.allowed_users for each row execute function public.apply_role();
 
 -- Bestehende Personen übernehmen.
-update public.allowed_users set role = case when is_admin then 'admin' when can_mail then 'postfach' else 'mitarbeit' end;
+update public.allowed_users set role = case when is_admin then 'admin' when can_mail then 'fuehrung' else 'mitarbeiter' end;
 
--- Gruppen: Mindest-Rolle (0 ehrenamt, 1 mitarbeit, 2 postfach, 3 admin)
+-- Gruppen: Mindest-Rolle (0 Ehrenamtler, 1 Mitarbeiter, 2 Führungskraft, 3 Admin)
 alter table public.projects add column if not exists min_level int not null default 0;
 create or replace function public.role_level() returns int language sql stable security definer set search_path = public as $$
-  select coalesce((select case role when 'admin' then 3 when 'postfach' then 2 when 'mitarbeit' then 1 else 0 end
+  select coalesce((select case role when 'admin' then 3 when 'fuehrung' then 2 when 'mitarbeiter' then 1 else 0 end
     from public.allowed_users where email = lower(auth.jwt() ->> 'email')), 0);
 $$;
 create or replace function public.can_see_project(pid uuid) returns boolean
@@ -35,6 +35,6 @@ language sql stable security definer set search_path = public as $$
     or exists (select 1 from public.projects p where p.id = pid and p.is_public and public.role_level() >= p.min_level));
 $$;
 
--- Gruppe für Ehrenamtliche (sehen alle). "Organisation" ist nur für Mitarbeit und höher.
+-- Gruppe für Ehrenamtliche (sehen alle). "Organisation" ist nur für Mitarbeiter und höher.
 insert into public.projects (name, sort, is_public, min_level) values ('Ehrenamtliche', 4, true, 0) on conflict (name) do nothing;
 update public.projects set min_level = 1 where name = 'Organisation';
