@@ -34,7 +34,7 @@
     confirmSend: null, sending: false, sendErr: "",
     mails: [], events: [], notes: [], projects: [], nSt: "idle", nErr: "", nBusy: false,
     mailSt: "idle", mailErr: "", mailNote: "", calSt: "idle", calErr: "", calNote: "",
-    gisReady: false, perms: null, connecting: false, connectErr: "", loadedAt: 0
+    gisReady: false, perms: null, vols: [], volSt: "idle", volErr: "", vq: "", connecting: false, connectErr: "", loadedAt: 0
   };
   var PROJECTS = DEMO ? ["Familie", "Haushalt", "Urlaub"] : ["Allgemein", "Tiere", "Organisation"];
   function projectNames() { return NSB && state.projects.length ? state.projects.map(function (p) { return p.name; }) : PROJECTS; }
@@ -66,6 +66,12 @@
       { d: 2, time: "14:30", title: "Kaffee bei Anna", place: "Annas Wohnung", src: "Google-Kalender" },
       { d: 4, time: "11:00", title: "Friseur", place: "Salon Roth", src: "iPhone-Kalender" }
     ].map(function (e) { e.date = key(addDays(e.d)); return e; });
+    state.vols = [
+      { id: "v1", name: "Anna Beispiel", task: "Tierpflege, Vormittag", contact: "" },
+      { id: "v2", name: "Max Muster", task: "Gartenarbeit", contact: "" },
+      { id: "v3", name: "Erika Probe", task: "Führungen für Schulklassen", contact: "" }
+    ];
+    state.volSt = "ok";
     state.notes = [
       { id: 1, project: "Familie", who: "Anna", when: "heute, 09:12", text: "Geburtstagsgeschenk für Opa: Gutschein oder lieber ein Buch?" },
       { id: 2, project: "Familie", who: "Mama", when: "gestern", text: "Sonntagskuchen: Apfel- oder Zwetschgenkuchen?" },
@@ -160,7 +166,7 @@
     if (NSB) {
       if (!N.session()) return render();
       if (ready()) scheduleExpiry();
-      go = ensurePerms().then(function () { return Promise.all([loadMail(), loadCal()]); });
+      go = ensurePerms().then(function () { loadVols(); return Promise.all([loadMail(), loadCal()]); });
     } else {
       if (!ready()) return render();
       scheduleExpiry();
@@ -169,6 +175,13 @@
     return go.then(function () { state.loadedAt = Date.now(); render(); });
   }
 
+  function loadVols() {
+    if (DEMO) return Promise.resolve();
+    if (!NSB || !N.session()) return Promise.resolve();
+    if (!state.vols.length) { state.volSt = "loading"; render(); }
+    return N.volunteers().then(function (r) { state.vols = r; state.volSt = "ok"; })
+      .catch(function (e) { state.volSt = "error"; state.volErr = friendly(e); }).then(render);
+  }
   function loadNotes() {
     if (!NSB || !N.session()) return Promise.resolve();
     state.nSt = "loading"; render();
@@ -190,10 +203,11 @@
     home: '<svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
     mail: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
     cal: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>',
-    proj: '<svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 11h8M8 15h8"/></svg>'
+    proj: '<svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 11h8M8 15h8"/></svg>',
+    team: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.9 0 5 2.2 5 5.8"/></svg>'
   };
-  var TABS = [["home", "Heute"], ["mail", "E-Mail"], ["cal", "Kalender"], ["proj", "Nachrichten"]];
-  var TITLES = { home: "Heute", mail: "E-Mail", cal: "Kalender", proj: "Nachrichten", settings: "Einstellungen" };
+  var TABS = [["home", "Heute"], ["mail", "E-Mail"], ["cal", "Kalender"], ["proj", "Nachrichten"], ["team", "Team"]];
+  var TITLES = { home: "Heute", mail: "E-Mail", cal: "Kalender", proj: "Nachrichten", team: "Team", settings: "Einstellungen" };
 
   function openMails() { return state.mails.filter(function (m) { return !m.answered; }); }
   function dayEvents(d) { var k = key(addDays(d)); return state.events.filter(function (e) { return e.date === k; }); }
@@ -345,6 +359,31 @@
       '<form class="card" id="noteform"><label for="note-text">Neue Notiz für ' + esc(state.project) + '</label><textarea id="note-text" required placeholder="Was soll das Team wissen?" style="min-height:100px"></textarea><div class="btns"><button class="btn" type="submit"' + (state.nBusy ? " disabled" : "") + ">Notiz speichern</button></div></form>";
   }
 
+  function volMatches(v) {
+    var q = state.vq.trim().toLowerCase();
+    return !q || (v.name + " " + (v.task || "") + " " + (v.contact || "")).toLowerCase().indexOf(q) >= 0;
+  }
+  function volRows() {
+    var list = state.vols.filter(volMatches);
+    var admin = state.perms && state.perms.is_admin;
+    return list.length ? list.map(function (v) {
+      return '<div class="row"><span class="grow"><div class="t">' + esc(v.name) + '</div><div class="s">' + [v.task, v.contact].filter(Boolean).map(esc).join(" · ") + "</div></span>" +
+        (admin && !DEMO ? '<button class="link" style="min-height:0" data-delvol="' + esc(v.id) + '">löschen</button>' : "") + "</div>";
+    }).join("") : '<div class="empty">' + (state.vols.length ? "Niemand gefunden." : "Noch keine Ehrenamtlichen eingetragen.") + "</div>";
+  }
+  function team() {
+    if (!DEMO) {
+      if (NSB && !N.session()) return loginCard();
+      if (NSB && !state.perms) return '<div class="empty">Lade …</div>';
+    }
+    var admin = !DEMO && state.perms && state.perms.is_admin;
+    return '<div class="info" style="margin-bottom:12px">Ehrenamtliche im Überblick. Die Liste sehen alle freigeschalteten Personen.</div>' +
+      '<div style="margin-bottom:12px"><label for="vq" class="sr">Suchen</label><input type="text" id="vq" placeholder="Suchen nach Name oder Aufgabe" value="' + esc(state.vq) + '"></div>' +
+      (state.volSt === "error" ? '<div class="info" style="background:var(--warn-soft);color:var(--warn);margin-bottom:12px">' + esc(state.volErr) + "</div>" : "") +
+      (state.volSt === "loading" ? '<div class="empty">Lade …</div>' : '<div class="list" id="vlist" style="margin-bottom:20px">' + volRows() + "</div>") +
+      (admin ? '<form class="card" id="volform"><h3>Liste importieren</h3><label for="vol-text">Eine Person pro Zeile: Name; Aufgabe; Kontakt (Aufgabe und Kontakt sind optional). Du kannst auch Zeilen aus einer Tabelle einfügen.</label><textarea id="vol-text" required placeholder="Anna Muster; Tierpflege; 0211 123456" style="min-height:140px"></textarea><div class="btns"><button class="btn" type="submit">Hinzufügen</button></div></form>' : "");
+  }
+
   function settings() {
     function row(t, s, p, soon) { return '<div class="set-row"><div><div class="t" style="font-weight:700">' + t + '</div><div class="s">' + s + '</div></div><span class="pill' + (soon ? " soon" : "") + '">' + p + "</span></div>"; }
     var google;
@@ -397,7 +436,7 @@
       if (DEMO) $sample.textContent = "Alle Inhalte sind Beispiele. Sobald in config.js eine Google-Client-ID steht, zeigt die App deine echten E-Mails und Termine.";
     }
     document.body.setAttribute("data-size", state.size);
-    $view.innerHTML = { home: home, mail: mail, cal: cal, proj: proj, settings: settings }[state.tab]();
+    $view.innerHTML = { home: home, mail: mail, cal: cal, proj: proj, team: team, settings: settings }[state.tab]();
     var n = openMails().length;
     $nav.innerHTML = TABS.map(function (t) {
       return '<button data-go="' + t[0] + '"' + (state.tab === t[0] ? ' aria-current="page"' : "") + ">" + ICON[t[0]] + "<span>" + t[1] + "</span>" + (t[0] === "mail" && n ? '<span class="badge">' + n + "</span>" : "") + "</button>";
@@ -440,6 +479,11 @@
     if (d.nlogin) { state.nErr = ""; N.signIn().catch(function (err) { state.nErr = friendly(err); render(); }); return; }
     if (d.nlogout) { N.signOut().then(function () { state.notes = []; state.projects = []; state.nSt = "idle"; state.perms = null; state.mails = []; state.events = []; render(); }); return; }
     if (d.nreload) { return loadNotes(); }
+    if (d.delvol) {
+      if (!window.confirm("Diese Person wirklich aus der Liste löschen?")) return;
+      N.removeVolunteer(d.delvol).then(function () { return loadVols(); }).catch(function (err) { toast("Löschen hat nicht geklappt: " + friendly(err)); });
+      return;
+    }
     if (d.delnote) {
       if (!window.confirm("Diese Notiz wirklich löschen?")) return;
       N.remove(d.delnote).then(loadNotes).catch(function (err) { toast("Löschen hat nicht geklappt: " + friendly(err)); });
@@ -507,6 +551,13 @@
       if (!DEMO) lsSet("tina_notes", JSON.stringify(state.notes));
       render(); toast("Notiz gespeichert.");
     }
+    if (id === "volform") {
+      var rows = document.getElementById("vol-text").value.split(/\r?\n/).map(function (l) { return l.split(/\t|;/).map(function (x) { return x.trim(); }); })
+        .filter(function (c) { return c[0]; }).map(function (c) { return { name: c[0], task: c[1] || null, contact: c.slice(2).filter(Boolean).join(" · ") || null }; });
+      if (!rows.length) return;
+      N.addVolunteers(rows).then(function () { toast(rows.length + " Person(en) hinzugefügt."); return loadVols(); })
+        .catch(function (err) { toast("Speichern hat nicht geklappt: " + friendly(err)); });
+    }
     if (id === "setform") {
       lsSet("tina_name", document.getElementById("set-name").value.trim());
       lsSet("tina_fam", document.getElementById("set-fam").value.trim());
@@ -514,6 +565,11 @@
     }
   });
 
+  document.addEventListener("input", function (e) {
+    if (e.target.id !== "vq") return;
+    state.vq = e.target.value;
+    var el = document.getElementById("vlist"); if (el) el.innerHTML = volRows();
+  });
   function typing() { var a = document.activeElement; return a && (a.tagName === "TEXTAREA" || a.tagName === "INPUT"); }
   function autoRefresh() {
     if (DEMO || document.visibilityState !== "visible" || state.openMail || typing()) return;

@@ -42,6 +42,9 @@
     return sb.from("notes").insert({ project_id: projectId, text: text, author_name: authorName || null }).then(must);
   }
   function remove(id) { return sb.from("notes").delete().eq("id", id).then(must); }
+  function volunteers() { return sb.from("volunteers").select("id,name,task,contact").order("name").then(must); }
+  function addVolunteers(rows) { return sb.from("volunteers").insert(rows).then(must); }
+  function removeVolunteer(id) { return sb.from("volunteers").delete().eq("id", id).then(must); }
   function perms() { return sb.from("allowed_users").select("can_mail,is_admin").maybeSingle().then(must); }
   function invoke(name, body) {
     return sb.functions.invoke(name, { body: body }).then(function (r) {
@@ -59,7 +62,7 @@
 
   root.TinaNotes = {
     configured: configured, init: init, signIn: signIn, signOut: signOut, user: user,
-    projects: projects, notes: notes, perms: perms, invoke: invoke, add: add, remove: remove, watch: watch,
+    projects: projects, notes: notes, perms: perms, invoke: invoke, volunteers: volunteers, addVolunteers: addVolunteers, removeVolunteer: removeVolunteer, add: add, remove: remove, watch: watch,
     session: function () { return !!ses; },
     onChange: function (f) { listeners.push(f); }
   };

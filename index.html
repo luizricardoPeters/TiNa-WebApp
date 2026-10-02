@@ -136,13 +136,14 @@ textarea { min-height: 150px; resize: vertical; }
 .seg button { min-height: 44px; padding: 0 16px; border: 0; background: var(--surface); font-weight: 700; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
 
-.nav { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; z-index: 6; }
-.nav button { border: 0; background: none; min-height: 58px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--muted); font-size: .8rem; font-weight: 700; position: relative; }
+.nav { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; z-index: 6; }
+.nav button { border: 0; padding-inline: 0; background: none; min-height: 58px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--muted); font-size: .8rem; font-weight: 700; position: relative; }
 .nav button svg { width: 26px; height: 26px; }
 .nav button[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
 .nav .badge { position: absolute; top: 4px; left: calc(50% + 8px); background: var(--warn); color: #fff; font-size: .7rem; min-width: 20px; height: 20px; border-radius: 10px; display: grid; place-items: center; padding-inline: 5px; }
 .toast { position: fixed; left: 16px; right: 16px; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); max-width: 608px; margin-inline: auto; background: var(--fg); color: var(--bg); border-radius: 12px; padding: 12px 16px; z-index: 9; font-weight: 700; }
 @media (prefers-reduced-motion: no-preference) { .toast { animation: up .2s ease-out; } @keyframes up { from { transform: translateY(8px); opacity: 0; } } }
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 </style>
 </head>
 <body>
@@ -165,11 +166,11 @@ textarea { min-height: 150px; resize: vertical; }
 /* Zoom sperren (iOS ignoriert user-scalable): Pinch-Gesten abfangen */
 ["gesturestart","gesturechange","gestureend"].forEach(function (e) { document.addEventListener(e, function (ev) { ev.preventDefault(); }); });
 </script>
-<script src="config.js?v=20261002c"></script>
-<script src="mail-logic.js?v=20261002c"></script>
-<script src="google.js?v=20261002c"></script>
-<script src="notes.js?v=20261002c"></script>
-<script src="app.js?v=20261002c"></script>
+<script src="config.js?v=20261002e"></script>
+<script src="mail-logic.js?v=20261002e"></script>
+<script src="google.js?v=20261002e"></script>
+<script src="notes.js?v=20261002e"></script>
+<script src="app.js?v=20261002e"></script>
 
 </body>
 </html>
