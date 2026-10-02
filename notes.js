@@ -17,7 +17,7 @@
       s.onerror = function () { ready = null; rej(new Error("Der Notizdienst konnte nicht geladen werden. Bitte die Internetverbindung prüfen.")); };
       document.head.appendChild(s);
     }).then(function () {
-      sb = root.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+      sb = root.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "implicit" } });
       sb.auth.onAuthStateChange(function (ev, s) { ses = s; emit(ev); });
       return sb.auth.getSession();
     }).then(function (r) { ses = r.data && r.data.session; return ses; });
@@ -42,13 +42,24 @@
     return sb.from("notes").insert({ project_id: projectId, text: text, author_name: authorName || null }).then(must);
   }
   function remove(id) { return sb.from("notes").delete().eq("id", id).then(must); }
+  function perms() { return sb.from("allowed_users").select("can_mail,is_admin").maybeSingle().then(must); }
+  function invoke(name, body) {
+    return sb.functions.invoke(name, { body: body }).then(function (r) {
+      if (!r.error) return r.data;
+      var c = r.error.context;
+      if (c && typeof c.json === "function") {
+        return c.json().then(function (j) { throw new Error(j && j.error ? j.error : r.error.message); }, function () { throw new Error(r.error.message); });
+      }
+      throw new Error(r.error.message);
+    });
+  }
   function watch() {
     return sb.channel("notes-changes").on("postgres_changes", { event: "*", schema: "public", table: "notes" }, function () { emit("NOTES_CHANGED"); }).subscribe();
   }
 
   root.TinaNotes = {
     configured: configured, init: init, signIn: signIn, signOut: signOut, user: user,
-    projects: projects, notes: notes, add: add, remove: remove, watch: watch,
+    projects: projects, notes: notes, perms: perms, invoke: invoke, add: add, remove: remove, watch: watch,
     session: function () { return !!ses; },
     onChange: function (f) { listeners.push(f); }
   };

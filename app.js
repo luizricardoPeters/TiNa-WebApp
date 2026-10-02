@@ -34,7 +34,7 @@
     confirmSend: null, sending: false, sendErr: "",
     mails: [], events: [], notes: [], projects: [], nSt: "idle", nErr: "", nBusy: false,
     mailSt: "idle", mailErr: "", mailNote: "", calSt: "idle", calErr: "", calNote: "",
-    gisReady: false, connecting: false, connectErr: "", loadedAt: 0
+    gisReady: false, perms: null, connecting: false, connectErr: "", loadedAt: 0
   };
   var PROJECTS = DEMO ? ["Familie", "Haushalt", "Urlaub"] : ["Allgemein", "Tiere", "Organisation"];
   function projectNames() { return NSB && state.projects.length ? state.projects.map(function (p) { return p.name; }) : PROJECTS; }
@@ -105,18 +105,46 @@
   }
 
   /* ---------- Laden (nur echter Modus) ---------- */
+  /* Gemeinschaftspostfach (über Supabase) und optional das eigene Gmail */
+  function mailShared() { return !DEMO && NSB && N.session() && !!state.perms && !!(state.perms.can_mail || state.perms.is_admin); }
+  function mailPersonal() { return !DEMO && ready() && G.has("mail") && (!NSB || mailShared()); }
+  function canAddEvent() { return DEMO || (NSB ? N.session() : (ready() && G.has("cal"))); }
+  function ensurePerms() {
+    if (state.perms) return Promise.resolve();
+    return N.perms().then(function (p) { state.perms = p || { can_mail: false, is_admin: false }; }).catch(function () { state.perms = { can_mail: false, is_admin: false }; });
+  }
+  function createEv(o) {
+    if (NSB) return N.invoke("shared", { action: "cal.create", title: o.title, date: o.date, time: o.time, place: o.place }).then(function () { return { date: o.date, time: o.time || null, title: o.title, place: o.place || "", src: "Gemeinschaftskalender" }; });
+    return G.createEvent(o);
+  }
+
   function loadMail() {
-    if (!G.has("mail")) { state.mailSt = "noscope"; return Promise.resolve(); }
-    state.mailSt = "loading"; render();
-    return G.inbox(CFG.MAIL_DAYS || 30, CFG.MAIL_LIMIT || 15).then(function (r) {
-      state.mails = r.mails.map(classify);
-      state.mailSt = "ok";
-      state.mailNote = r.failed ? r.failed + " E-Mail(s) konnten nicht geladen werden: " + friendly(r.last) : "";
-    }).catch(function (e) {
-      if (isAuth(e)) { state.mailSt = "idle"; } else { state.mailSt = "error"; state.mailErr = friendly(e); }
-    });
+    var sh = mailShared(), pe = mailPersonal();
+    if (!sh && !pe) { state.mailSt = (!NSB && ready() && !G.has("mail")) ? "noscope" : "idle"; return Promise.resolve(); }
+    if (!state.mails.length) { state.mailSt = "loading"; render(); }
+    var notes = [], days = CFG.MAIL_DAYS || 30, limit = CFG.MAIL_LIMIT || 15;
+    var pS = sh ? N.invoke("shared", { action: "mail.list", days: days, limit: limit }).then(function (r) {
+      return (r.threads || []).map(G.normThread).filter(Boolean).map(function (m) { m.box = "shared"; return m; });
+    }) : Promise.resolve([]);
+    var pP = pe ? G.inbox(days, limit).then(function (r) {
+      if (r.failed) notes.push(r.failed + " E-Mail(s) aus deinem eigenen Gmail konnten nicht geladen werden.");
+      return r.mails.map(function (m) { m.box = "personal"; return m; });
+    }).catch(function (e) { if (isAuth(e)) return []; throw e; }) : Promise.resolve([]);
+    return Promise.all([pS, pP]).then(function (r) {
+      var all = r[0].concat(r[1]);
+      all.sort(function (a, b) { return b.ts - a.ts; });
+      state.mails = all.map(classify); state.mailSt = "ok"; state.mailNote = notes.join(" ");
+    }).catch(function (e) { state.mailSt = "error"; state.mailErr = friendly(e); });
   }
   function loadCal() {
+    if (NSB) {
+      if (!N.session()) { state.calSt = "idle"; return Promise.resolve(); }
+      if (!state.events.length) { state.calSt = "loading"; render(); }
+      var from = new Date(); from.setHours(0, 0, 0, 0);
+      return N.invoke("shared", { action: "cal.list", days: 7, from: from.toISOString() }).then(function (r) {
+        state.events = G.expandItems(r.items, "Gemeinschaftskalender"); state.calSt = "ok"; state.calNote = "";
+      }).catch(function (e) { state.calSt = "error"; state.calErr = friendly(e); });
+    }
     if (!G.has("cal")) { state.calSt = "noscope"; return Promise.resolve(); }
     state.calSt = "loading"; render();
     return G.events(7).then(function (r) {
@@ -127,9 +155,18 @@
     });
   }
   function loadAll() {
-    if (!ready()) return render();
-    scheduleExpiry();
-    return Promise.all([loadMail(), loadCal()]).then(function () { state.loadedAt = Date.now(); render(); });
+    if (DEMO) return render();
+    var go;
+    if (NSB) {
+      if (!N.session()) return render();
+      if (ready()) scheduleExpiry();
+      go = ensurePerms().then(function () { return Promise.all([loadMail(), loadCal()]); });
+    } else {
+      if (!ready()) return render();
+      scheduleExpiry();
+      go = Promise.all([loadMail(), loadCal()]);
+    }
+    return go.then(function () { state.loadedAt = Date.now(); render(); });
   }
 
   function loadNotes() {
@@ -202,14 +239,37 @@
   var NOMAIL = "Der Zugriff auf E-Mails wurde bei der Anmeldung nicht erlaubt. In den Einstellungen unter „Berechtigungen neu erteilen“ bitte alle Häkchen setzen.";
   var NOCAL = "Der Zugriff auf den Kalender wurde bei der Anmeldung nicht erlaubt. In den Einstellungen unter „Berechtigungen neu erteilen“ bitte alle Häkchen setzen.";
 
+  function loginCard() {
+    return '<div class="card" style="margin-bottom:20px"><h3>Anmelden</h3><div>Melde dich mit deinem Google-Konto an. Nur freigeschaltete Adressen sehen die Inhalte der App.</div><div class="info">Google zeigt dabei eventuell den Hinweis „Nicht bestätigte App“. Dann auf „Erweitert“ und danach auf „Weiter“ tippen.</div>' +
+      (state.nErr ? '<div class="info" style="background:var(--warn-soft);color:var(--warn)">' + esc(state.nErr) + "</div>" : "") +
+      '<div class="btns"><button class="btn" data-nlogin="1"' + (state.nReady ? "" : " disabled") + ">" + (state.nReady ? "Mit Google anmelden" : "Wird vorbereitet …") + "</button></div></div>";
+  }
+  /* null = Inhalte zeigen, sonst die Karte, die statt der Inhalte erscheint */
+  function mailGate() {
+    if (DEMO) return null;
+    if (NSB) {
+      if (!N.session()) return loginCard();
+      if (!state.perms) return '<div class="empty">Lade …</div>';
+      if (!mailShared() && !mailPersonal()) return '<div class="info">Für dich ist kein Postfach freigegeben. Wenn du eines brauchst, frag den Betreiber der App.</div>';
+      return null;
+    }
+    return ready() ? null : connectCard();
+  }
+  function calGate() {
+    if (DEMO) return null;
+    if (NSB) return N.session() ? null : loginCard();
+    return ready() ? null : connectCard();
+  }
+
   /* ---------- Seiten ---------- */
   function home() {
     var open = openMails(), ev = dayEvents(0), fresh = state.notes.filter(isToday);
-    var head = '<div class="hello"><h2>Heute</h2><p>' + longDay(today) + "</p></div>" + (!DEMO && !ready() ? connectCard() : "");
-    var mailBox = DEMO || ready() || state.mails.length ? (stateBox(state.mailSt, state.mailErr, NOMAIL) ||
-      (open.length ? open.slice(0, 3).map(mailRow).join("") : '<div class="empty">' + (state.mailSt === "ok" || DEMO ? "Alles beantwortet." : "Noch keine E-Mails geladen.") + "</div>")) : '<div class="empty">Nach dem Verbinden erscheinen hier die offenen E-Mails.</div>';
-    var calBox = DEMO || ready() || state.events.length ? (stateBox(state.calSt, state.calErr, NOCAL) ||
-      (ev.length ? ev.map(eventRow).join("") : '<div class="empty">Heute stehen keine Termine an.</div>')) : '<div class="empty">Nach dem Verbinden erscheinen hier die Termine von heute.</div>';
+    var head = '<div class="hello"><h2>Heute</h2><p>' + longDay(today) + "</p></div>" + (!DEMO && (NSB ? !N.session() : !ready()) ? (NSB ? loginCard() : connectCard()) : "");
+    var mg = mailGate(), cg = calGate();
+    var mailBox = mg ? '<div class="empty">' + (NSB && N.session() && state.perms ? "Für dich ist kein Postfach freigegeben." : "Nach der Anmeldung erscheinen hier die offenen E-Mails.") + "</div>" :
+      (stateBox(state.mailSt, state.mailErr, NOMAIL) || (open.length ? open.slice(0, 3).map(mailRow).join("") : '<div class="empty">' + (state.mailSt === "ok" || DEMO ? "Alles beantwortet." : "Noch keine E-Mails geladen.") + "</div>"));
+    var calBox = cg ? '<div class="empty">Nach der Anmeldung erscheinen hier die Termine von heute.</div>' :
+      (stateBox(state.calSt, state.calErr, NOCAL) || (ev.length ? ev.map(eventRow).join("") : '<div class="empty">Heute stehen keine Termine an.</div>'));
     return head +
       '<section class="sec"><div class="sec-head"><h3>Noch zu beantworten' + (state.mailSt === "ok" || DEMO ? " (" + open.length + ")" : "") + '</h3><button class="link" data-go="mail">Alle E-Mails</button></div><div class="list">' + mailBox + "</div></section>" +
       '<section class="sec"><div class="sec-head"><h3>Heute im Kalender</h3><button class="link" data-go="cal">Kalender</button></div><div class="list">' + calBox + "</div></section>" +
@@ -217,9 +277,10 @@
       (fresh.length ? fresh.map(noteCard).join("") : '<div class="empty">Heute hat noch niemand etwas notiert.</div>') + "</div></section>";
   }
 
+  function canSend(m) { return DEMO || (m.box === "shared" ? mailShared() : (ready() && G.has("send"))); }
   function mail() {
-    var pre = !DEMO && !ready() ? connectCard() : "";
-    if (!DEMO && !ready() && !state.mails.length) return pre;
+    var pre = "";
+    var mg = mailGate(); if (mg) return mg;
     var sb = stateBox(state.mailSt, state.mailErr, NOMAIL);
     if (state.openMail) {
       var m = findMail(state.openMail);
@@ -227,7 +288,7 @@
       var t = "";
       if (m.termin) {
         t = '<div class="termin"><strong>Termin erkannt</strong><div>' + esc(m.termin.title) + ", " + longDay(new Date(m.termin.date + "T00:00")) + (m.termin.time ? " um " + m.termin.time + " Uhr" : "") + "</div>" +
-          '<div class="btns"><button class="btn" data-addtermin="' + esc(m.id) + '"' + (m.added || (!DEMO && !(ready() && G.has("cal"))) ? " disabled" : "") + ">" + (m.added ? "Eingetragen" : "In Kalender eintragen") + "</button></div></div>";
+          '<div class="btns"><button class="btn" data-addtermin="' + esc(m.id) + '"' + (m.added || !canAddEvent() ? " disabled" : "") + ">" + (m.added ? "Eingetragen" : "In Kalender eintragen") + "</button></div></div>";
       }
       var act;
       if (m.answered) act = '<div class="info">Diese E-Mail ist beantwortet.</div>';
@@ -237,10 +298,10 @@
           '<div class="btns"><button class="btn" data-sendyes="1"' + (state.sending ? " disabled" : "") + ">" + (state.sending ? "Sende …" : "Ja, jetzt senden") + '</button><button class="btn ghost" data-sendno="1"' + (state.sending ? " disabled" : "") + ">Noch ändern</button></div>";
       } else {
         act = '<label for="reply">Vorgeschlagene Antwort (bitte prüfen und bei Bedarf ändern)</label><textarea id="reply">' + esc(m.reply) + "</textarea>" +
-          (!DEMO && !G.has("send") ? '<div class="info" style="background:var(--warn-soft);color:var(--warn)">Das Senden wurde bei der Anmeldung nicht erlaubt. Bitte in den Einstellungen die Berechtigungen neu erteilen.</div>' : "") +
-          '<div class="btns"><button class="btn" data-send="' + esc(m.id) + '"' + (!DEMO && !(ready() && G.has("send")) ? " disabled" : "") + '>Antwort senden</button><button class="btn ghost" data-back="1">Später</button></div>';
+          (!DEMO && !canSend(m) ? '<div class="info" style="background:var(--warn-soft);color:var(--warn)">Das Senden ist für dieses Postfach nicht möglich. Bitte in den Einstellungen die Berechtigungen neu erteilen.</div>' : "") +
+          '<div class="btns"><button class="btn" data-send="' + esc(m.id) + '"' + (!canSend(m) ? " disabled" : "") + '>Antwort senden</button><button class="btn ghost" data-back="1">Später</button></div>';
       }
-      return pre + '<div class="card"><button class="link back" data-back="1">‹ Zurück zur Liste</button><div class="mail-head">' + catChip(m.cat) + '<h2 style="margin-top:8px">' + esc(m.subj) + '</h2><div class="s" style="color:var(--muted)">von ' + esc(m.from) + (m.fromEmail && m.fromName ? " (" + esc(m.fromEmail) + ")" : "") + '</div></div><div class="mail-body">' + esc(m.body) + "</div>" + t + act + "</div>";
+      return pre + '<div class="card"><button class="link back" data-back="1">‹ Zurück zur Liste</button><div class="mail-head">' + catChip(m.cat) + '<h2 style="margin-top:8px">' + esc(m.subj) + '</h2><div class="s" style="color:var(--muted)">' + (m.box === "shared" ? "Gemeinschaftspostfach · " : m.box === "personal" ? "Dein eigenes Gmail · " : "") + 'von ' + esc(m.from) + (m.fromEmail && m.fromName ? " (" + esc(m.fromEmail) + ")" : "") + '</div></div><div class="mail-body">' + esc(m.body) + "</div>" + t + act + "</div>";
     }
     var f = ["alle"].concat(Object.keys(CATS));
     var list = state.mails.filter(function (m) { return state.filter === "alle" || m.cat === state.filter; });
@@ -250,15 +311,15 @@
   }
 
   function cal() {
-    var pre = !DEMO && !ready() ? connectCard() : "";
-    if (!DEMO && !ready() && !state.events.length) return pre;
+    var pre = "";
+    var cg = calGate(); if (cg) return cg;
     var strip = "";
     for (var i = 0; i < 7; i++) {
       var d = addDays(i);
       strip += '<button data-day="' + i + '" aria-pressed="' + (state.day === i) + '" class="' + (dayEvents(i).length ? "has" : "") + '" aria-label="' + longDay(d) + '"><span>' + fmt(d, { weekday: "short" }) + "</span><span>" + d.getDate() + "</span></button>";
     }
     var ev = dayEvents(state.day);
-    var canAdd = DEMO || (ready() && G.has("cal"));
+    var canAdd = canAddEvent();
     return pre + stateBox(state.calSt, state.calErr, NOCAL) + (state.calNote ? '<div class="info" style="margin-bottom:12px">' + esc(state.calNote) + "</div>" : "") +
       '<div class="days">' + strip + '</div><div class="sec-head"><h3>' + longDay(addDays(state.day)) + '</h3></div><div class="list" style="margin-bottom:24px">' +
       (ev.length ? ev.map(eventRow).join("") : '<div class="empty">An diesem Tag steht nichts an.</div>') + "</div>" +
@@ -269,9 +330,7 @@
     if (NSB && state.nSt !== "ok") {
       var u = N.user(), msg;
       if (!N.session()) {
-        msg = '<div class="card"><h3>Anmelden für gemeinsame Notizen</h3><div>Melde dich mit deinem Google-Konto an. Nur freigeschaltete Adressen sehen die Notizen.</div><div class="info">Google zeigt dabei eventuell wieder den Hinweis „Nicht bestätigte App“. Wie bei E-Mail: „Erweitert“, dann „Weiter“.</div>' +
-          (state.nErr ? '<div class="info" style="background:var(--warn-soft);color:var(--warn)">' + esc(state.nErr) + "</div>" : "") +
-          '<div class="btns"><button class="btn" data-nlogin="1"' + (state.nReady ? "" : " disabled") + ">" + (state.nReady ? "Mit Google anmelden" : "Wird vorbereitet …") + "</button></div></div>";
+        msg = loginCard();
       } else if (state.nSt === "denied") {
         msg = '<div class="card"><h3>Noch nicht freigeschaltet</h3><div>Die Adresse ' + esc(u ? u.email : "") + ' hat keinen Zugriff auf die Notizen. Bitte beim Betreiber der App freischalten lassen.</div><div class="btns"><button class="btn ghost" data-nlogout="1">Abmelden</button></div></div>';
       } else if (state.nSt === "error") {
@@ -291,6 +350,26 @@
     var google;
     if (DEMO) {
       google = '<div class="card" style="margin-bottom:16px"><h3>Google</h3>' + row("Gmail und Kalender", "Es fehlt noch die Client-ID in der Datei config.js", "Demo", true) + "</div>";
+    } else if (NSB) {
+      var pm = state.perms || {};
+      google = '<div class="card" style="margin-bottom:16px"><h3>Deine Rechte</h3>' +
+        row("Angemeldet als", esc((N.user() || {}).email || "nicht angemeldet"), N.session() ? "Ja" : "Nein", !N.session()) +
+        row("Gemeinschaftskalender", "Ansehen und Termine eintragen", N.session() ? "Ja" : "Nein", !N.session()) +
+        row("Gemeinschaftspostfach", "E-Mails lesen und beantworten", pm.can_mail || pm.is_admin ? "Ja" : "Nein", !(pm.can_mail || pm.is_admin)) +
+        (pm.is_admin ? row("Verwaltung", "Gemeinschaftskonto verbinden", "Admin", false) : "") +
+        '<div class="btns" style="margin-top:8px"><button class="btn ghost" data-refresh="1">Neu laden</button></div></div>';
+      if (pm.is_admin) {
+        google += '<div class="card" style="margin-bottom:16px"><h3>Gemeinschaftskonto (Admin)</h3><div class="s" style="color:var(--muted)">Das Google-Konto, dessen Postfach und Kalender alle sehen. Wähle bei Google bitte genau dieses Konto aus. Das Verbinden ist einmalig nötig und danach dauerhaft gespeichert.</div>' +
+          (state.connectErr ? '<div class="info" style="background:var(--warn-soft);color:var(--warn)">' + esc(state.connectErr) + "</div>" : "") +
+          '<div class="btns"><button class="btn" data-gconnect="1">Gemeinschaftskonto verbinden</button></div></div>';
+      }
+      if (mailShared()) {
+        var on2 = ready();
+        google += '<div class="card" style="margin-bottom:16px"><h3>Eigenes Gmail (optional)</h3>' +
+          row("Dein persönliches Postfach", on2 && G.email() ? esc(G.email()) : "Nicht verbunden", on2 && G.has("mail") ? "Verbunden" : "Getrennt", !on2) +
+          '<div class="btns" style="margin-top:8px"><button class="btn' + (on2 ? " ghost" : "") + '" data-connect="1"' + (state.gisReady && !state.connecting ? "" : " disabled") + ">" + (on2 ? "Erneut verbinden" : "Eigenes Gmail verbinden") + "</button>" +
+          (G.wasConnected() ? '<button class="btn ghost" data-disconnect="1">Verbindung trennen</button>' : "") + "</div></div>";
+      }
     } else {
       var on = ready();
       google = '<div class="card" style="margin-bottom:16px"><h3>Google</h3>' +
@@ -339,9 +418,17 @@
         .catch(function (err) { state.connecting = false; state.connectErr = friendly(err); render(); });
       return;
     }
-    if (d.refresh) { return loadAll(); }
+    if (d.refresh) { state.perms = null; if (NSB) loadNotes(); return loadAll(); }
+    if (d.gconnect) {
+      var auth = "https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({
+        client_id: CFG.GOOGLE_CLIENT_ID, redirect_uri: location.origin + location.pathname, response_type: "code",
+        access_type: "offline", prompt: "consent select_account", state: "tina-connect",
+        scope: "openid email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.events"
+      }).toString();
+      location.href = auth; return;
+    }
     if (d.disconnect) {
-      G.disconnect(); state.mails = []; state.events = []; state.mailSt = "idle"; state.calSt = "idle"; state.openMail = null;
+      G.disconnect(); if (!NSB) { state.mails = []; state.events = []; state.mailSt = "idle"; state.calSt = "idle"; } else { state.mails = state.mails.filter(function (m) { return m.box === "shared"; }); } state.openMail = null;
       render(); return toast("Die Verbindung zu Google wurde getrennt.");
     }
     if (d.mail) { state.tab = "mail"; state.openMail = d.mail; state.confirmSend = null; state.sendErr = ""; var m = findMail(d.mail); if (m) m.unread = false; render(); return window.scrollTo(0, 0); }
@@ -351,7 +438,7 @@
     if (d.day === "0") { state.day = 0; return render(); }
     if (d.project) { state.project = d.project; return render(); }
     if (d.nlogin) { state.nErr = ""; N.signIn().catch(function (err) { state.nErr = friendly(err); render(); }); return; }
-    if (d.nlogout) { N.signOut().then(function () { state.notes = []; state.projects = []; state.nSt = "idle"; render(); }); return; }
+    if (d.nlogout) { N.signOut().then(function () { state.notes = []; state.projects = []; state.nSt = "idle"; state.perms = null; state.mails = []; state.events = []; render(); }); return; }
     if (d.nreload) { return loadNotes(); }
     if (d.delnote) {
       if (!window.confirm("Diese Notiz wirklich löschen?")) return;
@@ -372,7 +459,8 @@
         return toast("Beispiel: Hier würde die Antwort an " + sm.from + " gesendet.");
       }
       state.sending = true; state.sendErr = ""; render();
-      G.sendReply({ to: sm.replyTo || sm.fromEmail, subject: sm.subj, body: sm.reply, inReplyTo: sm.messageId, references: sm.references, threadId: sm.threadId })
+      var mime = { to: sm.replyTo || sm.fromEmail, subject: sm.subj, body: sm.reply, inReplyTo: sm.messageId, references: sm.references, threadId: sm.threadId };
+      (sm.box === "shared" ? N.invoke("shared", { action: "mail.send", raw: L.encodeB64Url(L.buildReplyMime(mime)), threadId: sm.threadId }) : G.sendReply(mime))
         .then(function () { sm.answered = true; state.sending = false; state.openMail = null; state.confirmSend = null; render(); toast("Antwort gesendet."); })
         .catch(function (err) { state.sending = false; state.sendErr = isAuth(err) ? "Die Anmeldung ist abgelaufen. Bitte unter „Heute“ neu verbinden; deine Antwort geht nicht verloren, solange du die Seite nicht neu lädst." : "Senden hat nicht geklappt: " + friendly(err); render(); });
       return;
@@ -385,7 +473,7 @@
         tm.added = true; render(); return toast("Termin im Kalender eingetragen: " + t.title);
       }
       b.disabled = true; b.textContent = "Trage ein …";
-      G.createEvent({ title: t.title, date: t.date, time: t.time, place: t.place })
+      createEv({ title: t.title, date: t.date, time: t.time, place: t.place })
         .then(function (ev) { state.events.push(ev); tm.added = true; render(); toast("Termin im Kalender eingetragen: " + t.title); })
         .catch(function (err) { b.disabled = false; b.textContent = "In Kalender eintragen"; toast(isAuth(err) ? "Anmeldung abgelaufen. Bitte unter „Heute“ neu verbinden." : "Eintragen hat nicht geklappt: " + friendly(err)); render(); });
     }
@@ -401,7 +489,7 @@
       var done = function (ev) { state.events.push(ev); if (diff >= 0 && diff < 7) state.day = diff; render(); toast("Termin gespeichert."); };
       if (DEMO) return done({ date: date, time: time, title: title, place: "Eigener Eintrag", src: "Google-Kalender" });
       var btn = e.target.querySelector("button[type=submit]"); btn.disabled = true; btn.textContent = "Speichere …";
-      G.createEvent({ title: title, date: date, time: time }).then(done).catch(function (err) {
+      createEv({ title: title, date: date, time: time }).then(done).catch(function (err) {
         render(); toast(isAuth(err) ? "Anmeldung abgelaufen. Bitte unter „Heute“ neu verbinden." : "Speichern hat nicht geklappt: " + friendly(err));
       });
     }
@@ -426,21 +514,45 @@
     }
   });
 
-  document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState !== "visible" || DEMO) return;
-    if (ready() && !state.openMail && state.loadedAt && Date.now() - state.loadedAt > 10 * 60000) loadAll(); else if (!state.openMail) render();
-  });
+  function typing() { var a = document.activeElement; return a && (a.tagName === "TEXTAREA" || a.tagName === "INPUT"); }
+  function autoRefresh() {
+    if (DEMO || document.visibilityState !== "visible" || state.openMail || typing()) return;
+    var can = NSB ? N.session() : ready();
+    if (can && (!state.loadedAt || Date.now() - state.loadedAt > 3 * 60000)) { loadAll(); if (NSB && state.nSt === "ok") loadNotes(); }
+    else render();
+  }
+  document.addEventListener("visibilitychange", autoRefresh);
+  setInterval(autoRefresh, 60000);
 
   /* ---------- Start ---------- */
+  function afterLogin() { loadNotes(); loadAll(); }
+  function handleConnectReturn() {
+    var q = new URLSearchParams(location.search);
+    if (q.get("state") !== "tina-connect") return;
+    var code = q.get("code"), err = q.get("error");
+    history.replaceState(null, "", location.pathname);
+    state.tab = "settings";
+    if (err || !code) { state.connectErr = "Google hat die Verbindung nicht erlaubt (" + (err || "kein Code") + ")."; render(); return; }
+    if (!N.session()) { state.connectErr = "Bitte zuerst anmelden und das Gemeinschaftskonto noch einmal verbinden."; render(); return; }
+    toast("Verbinde das Gemeinschaftskonto …");
+    N.invoke("google-connect", { code: code, redirect_uri: location.origin + location.pathname })
+      .then(function (r) { state.connectErr = ""; toast("Gemeinschaftskonto verbunden: " + r.email); loadAll(); })
+      .catch(function (e) { state.connectErr = friendly(e); render(); });
+  }
   render();
   if (NSB) {
-    N.onChange(function (ev) { if (ev === "SIGNED_IN" || ev === "INITIAL_SESSION") { if (state.nSt !== "ok" && state.nSt !== "loading") loadNotes(); } else if (ev === "NOTES_CHANGED") { loadNotes(); } });
-    N.init().then(function () { state.nReady = true; if (N.session()) { loadNotes(); N.watch(); } else render(); })
-      .catch(function (err) { state.nErr = friendly(err); render(); });
+    N.onChange(function (ev) {
+      if (ev === "SIGNED_IN" || ev === "INITIAL_SESSION") { if (state.nSt !== "ok" && state.nSt !== "loading") afterLogin(); }
+      else if (ev === "NOTES_CHANGED") { loadNotes(); }
+    });
+    N.init().then(function () {
+      state.nReady = true;
+      if (N.session()) { N.watch(); handleConnectReturn(); afterLogin(); } else render();
+    }).catch(function (err) { state.nErr = friendly(err); render(); });
   }
   if (!DEMO) {
     G.init().then(function () { state.gisReady = true; render(); })
       .catch(function (err) { state.connectErr = friendly(err); render(); });
-    if (ready()) loadAll();
+    if (!NSB && ready()) loadAll();
   }
 })();

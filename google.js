@@ -227,6 +227,13 @@
     email: function () { return S.email; }, name: function () { return S.name; }, given: function () { return S.given; },
     expiresIn: function () { return Math.max(0, S.expires - Date.now()); },
     inbox: inbox, sendReply: sendReply, events: events, createEvent: createEvent,
+    normThread: normThread,
+    expandItems: function (items, name) {
+      var out = [];
+      (items || []).forEach(function (ev) { if (ev.status !== "cancelled") expandEvent(ev, name, out); });
+      out.sort(function (a, b) { return (a.date + (a.time || "00:00")) < (b.date + (b.time || "00:00")) ? -1 : 1; });
+      return out;
+    },
     AuthError: AuthError
   };
 })(window);
