@@ -155,8 +155,8 @@
     cal: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>',
     proj: '<svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 11h8M8 15h8"/></svg>'
   };
-  var TABS = [["home", "Heute"], ["mail", "E-Mail"], ["cal", "Kalender"], ["proj", "Projekte"]];
-  var TITLES = { home: "Heute", mail: "E-Mail", cal: "Kalender", proj: "Projekte", settings: "Einstellungen" };
+  var TABS = [["home", "Heute"], ["mail", "E-Mail"], ["cal", "Kalender"], ["proj", "Nachrichten"]];
+  var TITLES = { home: "Heute", mail: "E-Mail", cal: "Kalender", proj: "Nachrichten", settings: "Einstellungen" };
 
   function openMails() { return state.mails.filter(function (m) { return !m.answered; }); }
   function dayEvents(d) { var k = key(addDays(d)); return state.events.filter(function (e) { return e.date === k; }); }
@@ -213,7 +213,7 @@
     return head +
       '<section class="sec"><div class="sec-head"><h3>Noch zu beantworten' + (state.mailSt === "ok" || DEMO ? " (" + open.length + ")" : "") + '</h3><button class="link" data-go="mail">Alle E-Mails</button></div><div class="list">' + mailBox + "</div></section>" +
       '<section class="sec"><div class="sec-head"><h3>Heute im Kalender</h3><button class="link" data-go="cal">Kalender</button></div><div class="list">' + calBox + "</div></section>" +
-      '<section class="sec"><div class="sec-head"><h3>Neue Notizen</h3><button class="link" data-go="proj">Projekte</button></div><div class="list">' +
+      '<section class="sec"><div class="sec-head"><h3>Neue Notizen</h3><button class="link" data-go="proj">Nachrichten</button></div><div class="list">' +
       (fresh.length ? fresh.map(noteCard).join("") : '<div class="empty">Heute hat noch niemand etwas notiert.</div>') + "</div></section>";
   }
 
@@ -280,7 +280,7 @@
       return msg;
     }
     var notes = state.notes.filter(function (n) { return n.project === state.project; });
-    return '<div class="filters" role="group" aria-label="Projekte">' + projectNames().map(function (p) { return '<button data-project="' + esc(p) + '" aria-pressed="' + (state.project === p) + '">' + esc(p) + "</button>"; }).join("") + "</div>" +
+    return '<div class="filters" role="group" aria-label="Gruppen">' + projectNames().map(function (p) { return '<button data-project="' + esc(p) + '" aria-pressed="' + (state.project === p) + '">' + esc(p) + "</button>"; }).join("") + "</div>" +
       '<div class="info" style="margin-bottom:16px">' + (DEMO ? "Hier erscheinen die gemeinsamen Notizen aus dem Projektordner." : NSB ? "Gemeinsame Notizen: alle freigeschalteten Personen sehen sie sofort." : "Diese Notizen liegen vorerst nur auf diesem Gerät.") + '</div><div class="list" style="margin-bottom:20px">' +
       (notes.length ? notes.map(noteCard).join("") : '<div class="empty">In diesem Projekt gibt es noch keine Notizen.</div>') + "</div>" +
       '<form class="card" id="noteform"><label for="note-text">Neue Notiz für ' + esc(state.project) + '</label><textarea id="note-text" required placeholder="Was soll das Team wissen?" style="min-height:100px"></textarea><div class="btns"><button class="btn" type="submit"' + (state.nBusy ? " disabled" : "") + ">Notiz speichern</button></div></form>";
